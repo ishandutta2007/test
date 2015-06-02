@@ -1,4 +1,5 @@
 include ../mixins/flash-messages
+//include ../../bower_components/ace/doc/template/jade/common_layout
 include ../mixins/auth/auth-forms
 
 doctype html
@@ -62,10 +63,6 @@ html
 						+auth-forms({ modal: true, initial: 'signin' })
 
 	//- JAVASCRIPT
-	script.
-		var SydJS = {};
-		SydJS.meetup = !{JSON.stringify(meetup)};
-
 	script(src='/js/lib/jquery/jquery-1.10.2.min.js')
 	script(src='http://cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.min.js')
 	script(src='/js/lib/bootstrap/collapse.js')
@@ -85,5 +82,4 @@ html
 	
 	//- ANALYTICS
 	include ../includes/layout/analytics
-	
 	block js

@@ -88,8 +88,8 @@ exports = module.exports = function(req, res) {
 					link_url: req.body.subscriber_email_link_url,
 					to: subscriber.email,
 					from: {
-						name: 'SydJS',
-						email: 'hello@sydjs.com'
+						name: 'Quantcollab',
+						email: 'hello@quantcollab.com'
 					}
 				}, doneSubscriber);
 			}, function(err) {

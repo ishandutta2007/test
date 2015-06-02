@@ -2,7 +2,6 @@ var _ = require('underscore'),
 	querystring = require('querystring'),
 	keystone = require('keystone');
 
-
 /**
 	Initialises the standard view locals
 */
@@ -17,7 +16,8 @@ exports.initLocals = function(req, res, next) {
 		{ label: 'Meetups',		key: 'meetups',		href: '/meetups' },
 		{ label: 'Members',		key: 'members',		href: '/members' },
 		{ label: 'Blog',		key: 'blog',		href: '/blog' },
-		{ label: 'Showbag',		key: 'showbag',		href: '/showbag' }
+//		{ label: 'Showbag',		key: 'showbag',		href: '/showbag' },
+		{ label: 'Editor',		key: 'editor',		href: '/editor' }
 	];
 	
 	locals.user = req.user;
@@ -25,7 +25,7 @@ exports.initLocals = function(req, res, next) {
 	locals.basedir = keystone.get('basedir');
 	
 	locals.page = {
-		title: 'SydJS',
+		title: 'Quantcollab',
 		path: req.url.split("?")[0] // strip the query - handy for redirecting back to the page
 	};
 	

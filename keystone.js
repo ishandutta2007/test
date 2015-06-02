@@ -53,6 +53,10 @@ keystone.init({
 	
 });
 
+// set your env variable CLOUDINARY_URL or set the following configuration
+keystone.set('cloudinary config', { cloud_name: 'microsoft', api_key: '397446694678985', api_secret: 'aBYpPpj39BUqA2J3Wm7z7S6fvAE' });
+CLOUDINARY_URL='cloudinary://397446694678985:aBYpPpj39BUqA2J3Wm7z7S6fvAE@microsoft'
+
 keystone.import('models');
 
 keystone.set('routes', require('./routes'));
