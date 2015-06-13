@@ -8,7 +8,7 @@ exports = module.exports = function(req, res) {
 		locals = res.locals;
 	
 	locals.section = 'editor';
-	locals.page.title = 'Trade IDE';
+	locals.page.title = 'Editor IDE';
 	locals.requirejs = requirejs;
 	locals.scrip = "AAPL";
 	
