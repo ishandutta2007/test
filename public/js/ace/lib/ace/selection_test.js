@@ -1,30 +1,37 @@
 /* ***** BEGIN LICENSE BLOCK *****
- * Distributed under the BSD license:
+ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
- * Copyright (c) 2010, Ajax.org B.V.
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Ajax.org B.V. nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL AJAX.ORG B.V. BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
+ *
+ * The Original Code is Ajax.org Code Editor (ACE).
+ *
+ * The Initial Developer of the Original Code is
+ * Ajax.org B.V.
+ * Portions created by the Initial Developer are Copyright (C) 2010
+ * the Initial Developer. All Rights Reserved.
+ *
+ * Contributor(s):
+ *      Fabian Jakobs <fabian AT ajax DOT org>
+ *
+ * Alternatively, the contents of this file may be used under the terms of
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * in which case the provisions of the GPL or the LGPL are applicable instead
+ * of those above. If you wish to allow use of your version of this file only
+ * under the terms of either the GPL or the LGPL, and not to allow others to
+ * use your version of this file under the terms of the MPL, indicate your
+ * decision by deleting the provisions above and replace them with the notice
+ * and other provisions required by the GPL or the LGPL. If you do not delete
+ * the provisions above, a recipient may use your version of this file under
+ * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
 
@@ -33,7 +40,6 @@ if (typeof process !== "undefined") {
 }
 
 define(function(require, exports, module) {
-"use strict";
 
 var EditSession = require("./edit_session").EditSession;
 var assert = require("./test/assertions");
@@ -88,36 +94,43 @@ module.exports = {
     },
 
     "test: move cursor word right" : function() {
-        var session = new EditSession([
-            "ab",
-            " Juhu Kinners (abc, 12)",
-            " cde"
-        ].join("\n"));
-        
+        var session = new EditSession( ["ab",
+                " Juhu Kinners (abc, 12)", " cde"].join("\n"));
         var selection = session.getSelection();
-        session.$selectLongWords = true;
 
         selection.moveCursorDown();
         assert.position(selection.getCursor(), 1, 0);
 
         selection.moveCursorWordRight();
+        assert.position(selection.getCursor(), 1, 1);
+
+        selection.moveCursorWordRight();
         assert.position(selection.getCursor(), 1, 5);
+
+        selection.moveCursorWordRight();
+        assert.position(selection.getCursor(), 1, 6);
 
         selection.moveCursorWordRight();
         assert.position(selection.getCursor(), 1, 13);
 
         selection.moveCursorWordRight();
+        assert.position(selection.getCursor(), 1, 15);
+
+        selection.moveCursorWordRight();
         assert.position(selection.getCursor(), 1, 18);
+
+        selection.moveCursorWordRight();
+        assert.position(selection.getCursor(), 1, 20);
 
         selection.moveCursorWordRight();
         assert.position(selection.getCursor(), 1, 22);
 
+        selection.moveCursorWordRight();
+        assert.position(selection.getCursor(), 1, 23);
+
         // wrap line
         selection.moveCursorWordRight();
-        assert.position(selection.getCursor(), 2, 4);
-        
-        selection.moveCursorWordRight();
-        assert.position(selection.getCursor(), 2, 4);
+        assert.position(selection.getCursor(), 2, 0);
     },
 
     "test: select word right if cursor in word" : function() {
@@ -136,51 +149,60 @@ module.exports = {
             " Juhu Kinners (abc, 12)",
             " cde"
         ].join("\n"));
-
+        
         var selection = session.getSelection();
-        session.$selectLongWords = true;
 
         selection.moveCursorDown();
         selection.moveCursorLineEnd();
         assert.position(selection.getCursor(), 1, 23);
 
         selection.moveCursorWordLeft();
+        assert.position(selection.getCursor(), 1, 22);
+
+        selection.moveCursorWordLeft();
         assert.position(selection.getCursor(), 1, 20);
+
+        selection.moveCursorWordLeft();
+        assert.position(selection.getCursor(), 1, 18);
 
         selection.moveCursorWordLeft();
         assert.position(selection.getCursor(), 1, 15);
 
         selection.moveCursorWordLeft();
+        assert.position(selection.getCursor(), 1, 13);
+
+        selection.moveCursorWordLeft();
         assert.position(selection.getCursor(), 1, 6);
+
+        selection.moveCursorWordLeft();
+        assert.position(selection.getCursor(), 1, 5);
 
         selection.moveCursorWordLeft();
         assert.position(selection.getCursor(), 1, 1);
 
+        selection.moveCursorWordLeft();
+        assert.position(selection.getCursor(), 1, 0);
+
         // wrap line
         selection.moveCursorWordLeft();
-        assert.position(selection.getCursor(), 0, 0);
-
-        selection.moveCursorWordLeft();
-        assert.position(selection.getCursor(), 0, 0);
+        assert.position(selection.getCursor(), 0, 2);
     },
-
-    "test: moveCursor word left with umlauts" : function() {
+        
+    "test: moveCursor word left" : function() {
         var session = new EditSession(" Fuß Füße");
-        session.$selectLongWords = true;
 
         var selection = session.getSelection();
         selection.moveCursorTo(0, 9)
         selection.moveCursorWordLeft();
         assert.position(selection.getCursor(), 0, 5);
-
+        
         selection.moveCursorWordLeft();
-        assert.position(selection.getCursor(), 0, 1);
+        assert.position(selection.getCursor(), 0, 4);
     },
 
     "test: select word left if cursor in word" : function() {
         var session = new EditSession("Juhu Kinners");
         var selection = session.getSelection();
-        session.$selectLongWords = true;
 
         selection.moveCursorTo(0, 8);
 
@@ -226,22 +248,9 @@ module.exports = {
         assert.position(range.end, 0, 12);
     },
 
-    "test: select word with cursor in word including right whitespace should select the word" : function() {
-        var session = new EditSession("Juhu Kinners      123");
-        var selection = session.getSelection();
-
-        selection.moveCursorTo(0, 8);
-        selection.selectAWord();
-
-        var range = selection.getRange();
-        assert.position(range.start, 0, 5);
-        assert.position(range.end, 0, 18);
-    },
-
     "test: select word with cursor betwen white space and word should select the word" : function() {
         var session = new EditSession("Juhu Kinners");
         var selection = session.getSelection();
-        session.$selectLongWords = true;
 
         selection.moveCursorTo(0, 4);
         selection.selectWord();
@@ -261,7 +270,6 @@ module.exports = {
     "test: select word with cursor in white space should select white space" : function() {
         var session = new EditSession("Juhu  Kinners");
         var selection = session.getSelection();
-        session.$selectLongWords = true;
 
         selection.moveCursorTo(0, 5);
         selection.selectWord();
@@ -274,7 +282,6 @@ module.exports = {
     "test: moving cursor should fire a 'changeCursor' event" : function() {
         var session = new EditSession("Juhu  Kinners");
         var selection = session.getSelection();
-        session.$selectLongWords = true;
 
         selection.moveCursorTo(0, 5);
 
@@ -290,7 +297,6 @@ module.exports = {
     "test: calling setCursor with the same position should not fire an event": function() {
         var session = new EditSession("Juhu  Kinners");
         var selection = session.getSelection();
-        session.$selectLongWords = true;
 
         selection.moveCursorTo(0, 5);
 
@@ -302,61 +308,67 @@ module.exports = {
         selection.moveCursorTo(0, 5);
         assert.notOk(called);
     },
-
-    "test: moveWordright should move past || and [": function() {
+    
+    "test: moveWordLeft should move past || and [": function() {
         var session = new EditSession("||foo[");
         var selection = session.getSelection();
-        session.$selectLongWords = true;
-
-        // Move behind ||foo
+        
+        // Move behind ||
+        selection.moveCursorWordRight();
+        assert.position(selection.getCursor(), 0, 2);
+        
+        // Move beind foo
         selection.moveCursorWordRight();
         assert.position(selection.getCursor(), 0, 5);
-
+        
         // Move behind [
         selection.moveCursorWordRight();
         assert.position(selection.getCursor(), 0, 6);
     },
-
-    "test: moveWordLeft should move past || and [": function() {
+    
+    "test: moveWordRight should move past || and [": function() {
         var session = new EditSession("||foo[");
         var selection = session.getSelection();
-        session.$selectLongWords = true;
-
+        
         selection.moveCursorTo(0, 6);
-
-        // Move behind [foo
+        
+        // Move behind [
+        selection.moveCursorWordLeft();
+        assert.position(selection.getCursor(), 0, 5);
+        
+        // Move beind foo
         selection.moveCursorWordLeft();
         assert.position(selection.getCursor(), 0, 2);
-
+        
         // Move behind ||
         selection.moveCursorWordLeft();
         assert.position(selection.getCursor(), 0, 0);
     },
-
+    
     "test: move cursor to line start should move cursor to end of the indentation first": function() {
         var session = new EditSession("12\n    Juhu\n12");
         var selection = session.getSelection();
-
+        
         selection.moveCursorTo(1, 6);
         selection.moveCursorLineStart();
 
         assert.position(selection.getCursor(), 1, 4);
     },
-
+    
     "test: move cursor to line start when the cursor is at the end of the indentation should move cursor to column 0": function() {
         var session = new EditSession("12\n    Juhu\n12");
         var selection = session.getSelection();
-
+        
         selection.moveCursorTo(1, 4);
         selection.moveCursorLineStart();
 
         assert.position(selection.getCursor(), 1, 0);
     },
-
+    
     "test: move cursor to line start when the cursor is at column 0 should move cursor to the end of the indentation": function() {
         var session = new EditSession("12\n    Juhu\n12");
         var selection = session.getSelection();
-
+        
         selection.moveCursorTo(1, 0);
         selection.moveCursorLineStart();
 
@@ -367,64 +379,64 @@ module.exports = {
     "test: move cursor to line start when the cursor is before the initial indentation should move cursor to the end of the indentation": function() {
         var session = new EditSession("12\n    Juhu\n12");
         var selection = session.getSelection();
-
+        
         selection.moveCursorTo(1, 2);
         selection.moveCursorLineStart();
 
         assert.position(selection.getCursor(), 1, 4);
     },
-
+    
     "test go line up when in the middle of the first line should go to document start": function() {
         var session = new EditSession("juhu kinners");
         var selection = session.getSelection();
-
+        
         selection.moveCursorTo(0, 4);
         selection.moveCursorUp();
 
         assert.position(selection.getCursor(), 0, 0);
     },
-
+    
     "test: (wrap) go line up when in the middle of the first line should go to document start": function() {
         var session = new EditSession("juhu kinners");
         session.setWrapLimitRange(5, 5);
         session.adjustWrapLimit(80);
-
+        
         var selection = session.getSelection();
-
+        
         selection.moveCursorTo(0, 4);
         selection.moveCursorUp();
 
         assert.position(selection.getCursor(), 0, 0);
     },
-
-
+    
+    
     "test go line down when in the middle of the last line should go to document end": function() {
         var session = new EditSession("juhu kinners");
         var selection = session.getSelection();
-
+        
         selection.moveCursorTo(0, 4);
         selection.moveCursorDown();
 
         assert.position(selection.getCursor(), 0, 12);
     },
-
+    
     "test (wrap) go line down when in the middle of the last line should go to document end": function() {
         var session = new EditSession("juhu kinners");
         session.setWrapLimitRange(8, 8);
         session.adjustWrapLimit(80);
 
         var selection = session.getSelection();
-
+        
         selection.moveCursorTo(0, 10);
         selection.moveCursorDown();
 
         assert.position(selection.getCursor(), 0, 12);
     },
-
+    
     "test go line up twice and then once down when in the second should go back to the previous column": function() {
         var session = new EditSession("juhu\nkinners");
         var selection = session.getSelection();
-
+        
         selection.moveCursorTo(1, 4);
         selection.moveCursorUp();
         selection.moveCursorUp();
@@ -432,44 +444,29 @@ module.exports = {
 
         assert.position(selection.getCursor(), 1, 4);
     },
-
+    
     "test (keyboard navigation) when curLine is not EOL and targetLine is all whitespace new column should be current column": function() {
-        var session = new EditSession("function (a) {\n    \n}");
+        var session = new EditSession("function (a) {\n\
+    \n\
+}");
         var selection = session.getSelection();
-
+        
         selection.moveCursorTo(2, 0);
         selection.moveCursorUp();
 
         assert.position(selection.getCursor(), 1, 0);
     },
-
-    "test (keyboard navigation) when curLine is EOL and targetLine is shorter than current column, new column should be targetLine's EOL": function() {
-        var session = new EditSession("function (a) {\n    \n}");
+    
+    "test (keyboard navigation) when curLine is EOL and targetLine is shorter dan current column, new column should be targetLine's EOL": function() {
+        var session = new EditSession("function (a) {\n\
+    \n\
+}");
         var selection = session.getSelection();
-
+        
         selection.moveCursorTo(0, 14);
         selection.moveCursorDown();
 
         assert.position(selection.getCursor(), 1, 4);
-    },
-
-    "test fromJSON/toJSON": function() {
-        var session = new EditSession("function (a) {\n    \n}");
-        var selection = session.getSelection();
-
-        selection.moveCursorTo(0, 14);
-        selection.moveCursorDown();
-        assert.position(selection.getCursor(), 1, 4);
-        var data = selection.toJSON();
-        data = JSON.parse(JSON.stringify(data))
-        selection.moveCursorDown();        
-        assert.position(selection.getCursor(), 2, 1);
-        
-        assert.ok(!selection.isEqual(data));
-        
-        selection.fromJSON(data);
-        assert.position(selection.getCursor(), 1, 4);
-        assert.ok(selection.isEqual(data));
     }
 };
 

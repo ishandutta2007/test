@@ -1,91 +1,274 @@
 /* ***** BEGIN LICENSE BLOCK *****
- * Distributed under the BSD license:
+ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
- * Copyright (c) 2010, Ajax.org B.V.
- * All rights reserved.
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Ajax.org B.V. nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL AJAX.ORG B.V. BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * The Original Code is Mozilla Skywriter.
+ *
+ * The Initial Developer of the Original Code is
+ * Mozilla.
+ * Portions created by the Initial Developer are Copyright (C) 2009
+ * the Initial Developer. All Rights Reserved.
+ *
+ * Contributor(s):
+ *      Fabian Jakobs <fabian AT ajax DOT org>
+ *      Kevin Dangoor (kdangoor@mozilla.com)
+ *      Julian Viereck <julian DOT viereck AT gmail DOT com>
+ *
+ * Alternatively, the contents of this file may be used under the terms of
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * in which case the provisions of the GPL or the LGPL are applicable instead
+ * of those above. If you wish to allow use of your version of this file only
+ * under the terms of either the GPL or the LGPL, and not to allow others to
+ * use your version of this file under the terms of the MPL, indicate your
+ * decision by deleting the provisions above and replace them with the notice
+ * and other provisions required by the GPL or the LGPL. If you do not delete
+ * the provisions above, a recipient may use your version of this file under
+ * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
 
 
 define(function(require, exports, module) {
-"use strict";
 
 require("ace/lib/fixoldbrowsers");
-
-require("ace/multi_select");
-require("ace/ext/spellcheck");
-require("./inline_editor");
-require("./dev_util");
-require("./file_drop");
-
-var config = require("ace/config");
-config.init();
 var env = {};
-
-var dom = require("ace/lib/dom");
+    
 var net = require("ace/lib/net");
-var lang = require("ace/lib/lang");
-var useragent = require("ace/lib/useragent");
-
 var event = require("ace/lib/event");
+var Range = require("ace/range").Range;
+var Editor = require("ace/editor").Editor;
+var Renderer = require("ace/virtual_renderer").VirtualRenderer;
 var theme = require("ace/theme/textmate");
 var EditSession = require("ace/edit_session").EditSession;
 var UndoManager = require("ace/undomanager").UndoManager;
 
+var vim = require("ace/keyboard/keybinding/vim").Vim;
+var emacs = require("ace/keyboard/keybinding/emacs").Emacs;
 var HashHandler = require("ace/keyboard/hash_handler").HashHandler;
 
-var Renderer = require("ace/virtual_renderer").VirtualRenderer;
-var Editor = require("ace/editor").Editor;
 
-var whitespace = require("ace/ext/whitespace");
+var modesByName;
 
+var Doc = function(name, desc, file) {
+    this.name = name;
+    this.desc = desc;
+    this.doc = new EditSession(file);
+    this.doc.setMode(modesByName[name].mode);
+    this.doc.setUndoManager(new UndoManager());
+};
 
+var WrappedDoc = function(name, desc, file) {
+    Doc.apply(this, arguments);
+    
+    this.doc.setUseWrapMode(true);
+    this.doc.setWrapLimitRange(80, 80);
+};
 
-var doclist = require("./doclist");
-var modelist = require("ace/ext/modelist");
-var themelist = require("ace/ext/themelist");
-var layout = require("./layout");
-var TokenTooltip = require("./token_tooltip").TokenTooltip;
-var util = require("./util");
-var saveOption = util.saveOption;
-var fillDropdown = util.fillDropdown;
-var bindCheckbox = util.bindCheckbox;
-var bindDropdown = util.bindDropdown;
+var Mode = function(name, desc, clazz, extensions) {
+    this.name = name;
+    this.desc = desc;
+    this.clazz = clazz;
+    this.mode = new clazz();
+    this.mode.name = name;
+    
+    this.extRe = new RegExp("^.*\\.(" + extensions.join("|") + ")$", "g");
+};
 
-var ElasticTabstopsLite = require("ace/ext/elastic_tabstops_lite").ElasticTabstopsLite;
+Mode.prototype.supportsFile = function(filename) {
+    return filename.match(this.extRe);
+};
 
-var IncrementalSearch = require("ace/incremental_search").IncrementalSearch;
-
-
-var workerModule = require("ace/worker/worker_client");
-if (location.href.indexOf("noworker") !== -1) {
-    workerModule.WorkerClient = workerModule.UIWorkerClient;
+var themes = {};
+function loadTheme(name, callback) {
+    if (themes[name])
+        return callback();
+        
+    themes[name] = 1;
+    var base = name.split("/").pop();
+    var fileName = "src/theme-" + base + ".js";
+    net.loadScript(fileName, callback);
 }
 
-/*********** create editor ***************************/
-var container = document.getElementById("editor-container");
+var modes = [
+    new Mode("c_cpp", "C/C++", require("ace/mode/c_cpp").Mode, ["c", "cpp", "cxx", "h", "hpp"]),
+    new Mode("clojure", "Clojure", require("ace/mode/clojure").Mode, ["clj"]),
+    new Mode("coffee", "CoffeeScript", require("ace/mode/coffee").Mode, ["coffee"]),
+    new Mode("coldfusion", "ColdFusion", require("ace/mode/coldfusion").Mode, ["cfm"]),
+    new Mode("csharp", "C#", require("ace/mode/csharp").Mode, ["cs"]),
+    new Mode("css", "CSS", require("ace/mode/css").Mode, ["css"]),
+    new Mode("groovy", "Groovy", require("ace/mode/groovy").Mode, ["groovy"]),
+    new Mode("haxe", "haXe", require("ace/mode/haxe").Mode, ["hx"]),
+    new Mode("html", "HTML", require("ace/mode/html").Mode, ["html", "htm"]),
+    new Mode("java", "Java", require("ace/mode/java").Mode, ["java"]),
+    new Mode("javascript", "JavaScript", require("ace/mode/javascript").Mode, ["js"]),
+    new Mode("json", "JSON", require("ace/mode/json").Mode, ["json"]),
+    new Mode("latex", "LaTeX", require("ace/mode/latex").Mode, ["tex"]),
+    new Mode("lua", "Lua", require("ace/mode/lua").Mode, ["lua"]),
+    new Mode("markdown", "MarkDown", require("ace/mode/markdown").Mode, ["md", "markdown"]),
+    new Mode("ocaml", "OCaml", require("ace/mode/ocaml").Mode, ["ml", "mli"]),
+    new Mode("perl", "Perl", require("ace/mode/perl").Mode, ["pl", "pm"]),
+    new Mode("php", "PHP",require("ace/mode/php").Mode, ["php"]),
+    new Mode("powershell", "Powershell", require("ace/mode/powershell").Mode, ["ps1"]),
+    new Mode("python", "Python", require("ace/mode/python").Mode, ["py"]),
+    new Mode("scala", "Scala", require("ace/mode/scala").Mode, ["scala"]),
+    new Mode("scss", "SCSS", require("ace/mode/scss").Mode, ["scss"]),
+    new Mode("ruby", "Ruby", require("ace/mode/ruby").Mode, ["rb"]),
+    new Mode("sql", "SQL", require("ace/mode/sql").Mode, ["sql"]),
+    new Mode("svg", "SVG", require("ace/mode/SVG").Mode, ["svg"]),
+    new Mode("text", "Text", require("ace/mode/text").Mode, ["txt"]),
+    new Mode("textile", "Textile", require("ace/mode/textile").Mode, ["textile"]),
+    new Mode("xml", "XML", require("ace/mode/xml").Mode, ["xml"])
+];
+
+modesByName = {};
+modes.forEach(function(m) {
+    modesByName[m.name] = m;
+});
+
+var loreIpsum = require("ace/requirejs/text!./docs/plaintext.txt");
+for (var i = 0; i < 5; i++) {
+    loreIpsum += loreIpsum;
+}
+
+var docs = [
+    new Doc(
+        "javascript", "JavaScript",
+        require("ace/requirejs/text!./docs/javascript.js")
+    ),
+    new WrappedDoc("text", "Plain Text", loreIpsum),
+    new Doc(
+        "coffee", "Coffeescript",
+        require("ace/requirejs/text!./docs/coffeescript.coffee")
+    ),
+    new Doc(
+        "json", "JSON",
+        require("ace/requirejs/text!./docs/json.json")
+    ),
+    new Doc(
+        "css", "CSS",
+        require("ace/requirejs/text!./docs/css.css")
+    ),
+    new Doc(
+        "scss", "SCSS",
+        require("ace/requirejs/text!./docs/scss.scss")
+    ),
+    new Doc(
+        "html", "HTML",
+        require("ace/requirejs/text!./docs/html.html")
+    ),
+    new Doc(
+        "xml", "XML",
+        require("ace/requirejs/text!./docs/xml.xml")
+    ),
+    new Doc(
+        "svg", "SVG",
+        require("ace/requirejs/text!./docs/svg.svg")
+    ),
+    new Doc(
+        "php", "PHP",
+        require("ace/requirejs/text!./docs/php.php")
+    ),
+    new Doc(
+        "coldfusion", "ColdFusion",
+        require("ace/requirejs/text!./docs/coldfusion.cfm")
+    ),
+    new Doc(
+        "python", "Python",
+        require("ace/requirejs/text!./docs/python.py")
+    ),
+    new Doc(
+        "ruby", "Ruby",
+        require("ace/requirejs/text!./docs/ruby.rb")
+    ),
+    new Doc(
+        "perl", "Perl",
+        require("ace/requirejs/text!./docs/perl.pl")
+    ),
+    new Doc(
+        "ocaml", "OCaml",
+        require("ace/requirejs/text!./docs/ocaml.ml")
+    ),
+    new Doc(
+        "lua", "Lua",
+        require("ace/requirejs/text!./docs/lua.lua")
+    ),
+    new Doc(
+        "java", "Java",
+        require("ace/requirejs/text!./docs/java.java")
+    ),
+    new Doc(
+        "clojure", "Clojure",
+        require("ace/requirejs/text!./docs/clojure.clj")
+    ),
+    new Doc(
+        "groovy", "Groovy",
+        require("ace/requirejs/text!./docs/groovy.groovy")
+    ),
+    new Doc(
+        "scala", "Scala",
+        require("ace/requirejs/text!./docs/scala.scala")
+    ),
+    new Doc(
+        "csharp", "C#",
+        require("ace/requirejs/text!./docs/csharp.cs")
+    ),
+    new Doc(
+        "powershell", "Powershell",
+        require("ace/requirejs/text!./docs/powershell.ps1")
+    ),
+    new Doc(
+        "c_cpp", "C/C++",
+        require("ace/requirejs/text!./docs/cpp.cpp")
+    ),
+    new Doc(
+        "haxe", "haXe",
+        require("ace/requirejs/text!./docs/Haxe.hx")
+    ),
+    new WrappedDoc(
+        "markdown", "Markdown",
+        require("ace/requirejs/text!./docs/markdown.md")
+    ),
+    new WrappedDoc(
+        "textile", "Textile",
+        require("ace/requirejs/text!./docs/textile.textile")
+    ),
+    new WrappedDoc(
+        "latex", "LaTeX",
+        require("ace/requirejs/text!./docs/latex.tex")
+    )
+];
+
+var docsByName = {};
+docs.forEach(function(d) {
+    docsByName[d.name] = d;
+});
+
+var keybindings = {
+    // Null = use "default" keymapping
+    ace: null,
+    vim: vim,
+    emacs: emacs,
+    // This is a way to define simple keyboard remappings
+    custom: new HashHandler({
+        "gotoright":      "Tab",
+        "indent":         "]",
+        "outdent":        "[",
+        "gotolinestart":  "^",
+        "gotolineend":    "$"
+     })
+};
+
+var container = document.getElementById("editor");
 
 // Splitting.
 var Split = require("ace/split").Split;
@@ -97,198 +280,12 @@ split.on("focus", function(editor) {
 });
 env.split = split;
 window.env = env;
+window.ace = env.editor;
 
-
-var consoleEl = dom.createElement("div");
-container.parentNode.appendChild(consoleEl);
-consoleEl.style.cssText = "position:fixed; bottom:1px; right:0;\
-border:1px solid #baf; z-index:100";
-
-var cmdLine = new layout.singleLineEditor(consoleEl);
-cmdLine.editor = env.editor;
-env.editor.cmdLine = cmdLine;
-
-env.editor.showCommandLine = function(val) {
-    this.cmdLine.focus();
-    if (typeof val == "string")
-        this.cmdLine.setValue(val, 1);
-};
-
-/**
- * This demonstrates how you can define commands and bind shortcuts to them.
- */
-env.editor.commands.addCommands([{
-    name: "gotoline",
-    bindKey: {win: "Ctrl-L", mac: "Command-L"},
-    exec: function(editor, line) {
-        if (typeof line == "object") {
-            var arg = this.name + " " + editor.getCursorPosition().row;
-            editor.cmdLine.setValue(arg, 1);
-            editor.cmdLine.focus();
-            return;
-        }
-        line = parseInt(line, 10);
-        if (!isNaN(line))
-            editor.gotoLine(line);
-    },
-    readOnly: true
-}, {
-    name: "snippet",
-    bindKey: {win: "Alt-C", mac: "Command-Alt-C"},
-    exec: function(editor, needle) {
-        if (typeof needle == "object") {
-            editor.cmdLine.setValue("snippet ", 1);
-            editor.cmdLine.focus();
-            return;
-        }
-        var s = snippetManager.getSnippetByName(needle, editor);
-        if (s)
-            snippetManager.insertSnippet(editor, s.content);
-    },
-    readOnly: true
-}, {
-    name: "focusCommandLine",
-    bindKey: "shift-esc|ctrl-`",
-    exec: function(editor, needle) { editor.cmdLine.focus(); },
-    readOnly: true
-}, {
-    name: "nextFile",
-    bindKey: "Ctrl-tab",
-    exec: function(editor) { doclist.cycleOpen(editor, 1); },
-    readOnly: true
-}, {
-    name: "previousFile",
-    bindKey: "Ctrl-shift-tab",
-    exec: function(editor) { doclist.cycleOpen(editor, -1); },
-    readOnly: true
-}, {
-    name: "execute",
-    bindKey: "ctrl+enter",
-    exec: function(editor) {
-        try {
-            var r = window.eval(editor.getCopyText() || editor.getValue());
-        } catch(e) {
-            r = e;
-        }
-        editor.cmdLine.setValue(r + "");
-    },
-    readOnly: true
-}, {
-    name: "showKeyboardShortcuts",
-    bindKey: {win: "Ctrl-Alt-h", mac: "Command-Alt-h"},
-    exec: function(editor) {
-        config.loadModule("ace/ext/keybinding_menu", function(module) {
-            module.init(editor);
-            editor.showKeyboardShortcuts();
-        });
-    }
-}, {
-    name: "increaseFontSize",
-    bindKey: "Ctrl-=|Ctrl-+",
-    exec: function(editor) {
-        var size = parseInt(editor.getFontSize(), 10) || 12;
-        editor.setFontSize(size + 1);
-    }
-}, {
-    name: "decreaseFontSize",
-    bindKey: "Ctrl+-|Ctrl-_",
-    exec: function(editor) {
-        var size = parseInt(editor.getFontSize(), 10) || 12;
-        editor.setFontSize(Math.max(size - 1 || 1));
-    }
-}, {
-    name: "resetFontSize",
-    bindKey: "Ctrl+0|Ctrl-Numpad0",
-    exec: function(editor) {
-        editor.setFontSize(12);
-    }
-}]);
-
-
-env.editor.commands.addCommands(whitespace.commands);
-
-cmdLine.commands.bindKeys({
-    "Shift-Return|Ctrl-Return|Alt-Return": function(cmdLine) { cmdLine.insert("\n"); },
-    "Esc|Shift-Esc": function(cmdLine){ cmdLine.editor.focus(); },
-    "Return": function(cmdLine){
-        var command = cmdLine.getValue().split(/\s+/);
-        var editor = cmdLine.editor;
-        editor.commands.exec(command[0], editor, command[1]);
-        editor.focus();
-    }
-});
-
-cmdLine.commands.removeCommands(["find", "gotoline", "findall", "replace", "replaceall"]);
-
-var commands = env.editor.commands;
-commands.addCommand({
-    name: "save",
-    bindKey: {win: "Ctrl-S", mac: "Command-S"},
-    exec: function(arg) {
-        var session = env.editor.session;
-        var name = session.name.match(/[^\/]+$/);
-        localStorage.setItem(
-            "saved_file:" + name,
-            session.getValue()
-        );
-        env.editor.cmdLine.setValue("saved "+ name);
-    }
-});
-
-commands.addCommand({
-    name: "load",
-    bindKey: {win: "Ctrl-O", mac: "Command-O"},
-    exec: function(arg) {
-        var session = env.editor.session;
-        var name = session.name.match(/[^\/]+$/);
-        var value = localStorage.getItem("saved_file:" + name);
-        if (typeof value == "string") {
-            session.setValue(value);
-            env.editor.cmdLine.setValue("loaded "+ name);
-        } else {
-            env.editor.cmdLine.setValue("no previuos value saved for "+ name);
-        }
-    }
-});
-
-var keybindings = {
-    ace: null, // Null = use "default" keymapping
-    vim: require("ace/keyboard/vim").handler,
-    emacs: "ace/keyboard/emacs",
-    // This is a way to define simple keyboard remappings
-    custom: new HashHandler({
-        "gotoright":      "Tab",
-        "indent":         "]",
-        "outdent":        "[",
-        "gotolinestart":  "^",
-        "gotolineend":    "$"
-    })
-};
-
-
-
-/*********** manage layout ***************************/
-var consoleHeight = 20;
-function onResize() {
-    var left = env.split.$container.offsetLeft;
-    var width = document.documentElement.clientWidth - left;
-    container.style.width = width + "px";
-    container.style.height = document.documentElement.clientHeight - consoleHeight + "px";
-    env.split.resize();
-
-    consoleEl.style.width = width + "px";
-    cmdLine.resize();
-}
-
-window.onresize = onResize;
-onResize();
-
-/*********** options panel ***************************/
 var docEl = document.getElementById("doc");
 var modeEl = document.getElementById("mode");
 var wrapModeEl = document.getElementById("soft_wrap");
 var themeEl = document.getElementById("theme");
-var foldingEl = document.getElementById("folding");
 var selectStyleEl = document.getElementById("select_style");
 var highlightActiveEl = document.getElementById("highlight_active");
 var showHiddenEl = document.getElementById("show_hidden");
@@ -296,109 +293,71 @@ var showGutterEl = document.getElementById("show_gutter");
 var showPrintMarginEl = document.getElementById("show_print_margin");
 var highlightSelectedWordE = document.getElementById("highlight_selected_word");
 var showHScrollEl = document.getElementById("show_hscroll");
-var showVScrollEl = document.getElementById("show_vscroll");
-var animateScrollEl = document.getElementById("animate_scroll");
 var softTabEl = document.getElementById("soft_tab");
 var behavioursEl = document.getElementById("enable_behaviours");
 
-fillDropdown(docEl, doclist.all);
-
-fillDropdown(modeEl, modelist.modes);
-var modesByName = modelist.modesByName;
-bindDropdown("mode", function(value) {
-    env.editor.session.setMode(modesByName[value].mode || modesByName.text.mode);
-    env.editor.session.modeName = value;
+docs.forEach(function(doc) {
+    var option = document.createElement("option");
+    option.setAttribute("value", doc.name);
+    option.innerHTML = doc.desc;
+    docEl.appendChild(option);
 });
 
-doclist.history = doclist.docs.map(function(doc) {
-    return doc.name;
-});
-doclist.history.index = 0;
-doclist.cycleOpen = function(editor, dir) {
-    var h = this.history;
-    h.index += dir;
-    if (h.index >= h.length)
-        h.index = 0;
-    else if (h.index <= 0)
-        h.index = h.length - 1;
-    var s = h[h.index];
-    docEl.value = s;
-    docEl.onchange();
-};
-doclist.addToHistory = function(name) {
-    var h = this.history;
-    var i = h.indexOf(name);
-    if (i != h.index) {
-        if (i != -1)
-            h.splice(i, 1);
-        h.index = h.push(name);
-    }
-};
-
-bindDropdown("doc", function(name) {
-    doclist.loadDoc(name, function(session) {
-        if (!session)
-            return;
-        doclist.addToHistory(session.name);
-        session = env.split.setSession(session);
-        whitespace.detectIndentation(session);
-        updateUIEditorOptions();
-        env.editor.focus();
-    });
+modes.forEach(function(mode) {
+    var option = document.createElement("option");
+    option.setAttribute("value", mode.name);
+    option.innerHTML = mode.desc;
+    modeEl.appendChild(option);
 });
 
+bindDropdown("doc", function(value) {
+    var doc = docsByName[value].doc;
+    var session = env.split.setSession(doc);
+    session.name = doc.name;
+
+    updateUIEditorOptions();
+
+    env.editor.focus();
+});
 
 function updateUIEditorOptions() {
     var editor = env.editor;
     var session = editor.session;
 
-    session.setFoldStyle(foldingEl.value);
+    docEl.value = session.name;
+    modeEl.value = session.getMode().name || "text";
 
-    saveOption(docEl, session.name);
-    saveOption(modeEl, session.modeName || "text");
-    saveOption(wrapModeEl, session.getUseWrapMode() ? session.getWrapLimitRange().min || "free" : "off");
+    if (!session.getUseWrapMode()) {
+        wrapModeEl.value = "off";
+    } else {
+        wrapModeEl.value = session.getWrapLimitRange().min || "free";
+    }
 
-    saveOption(selectStyleEl, editor.getSelectionStyle() == "line");
-    saveOption(themeEl, editor.getTheme());
-    saveOption(highlightActiveEl, editor.getHighlightActiveLine());
-    saveOption(showHiddenEl, editor.getShowInvisibles());
-    saveOption(showGutterEl, editor.renderer.getShowGutter());
-    saveOption(showPrintMarginEl, editor.renderer.getShowPrintMargin());
-    saveOption(highlightSelectedWordE, editor.getHighlightSelectedWord());
-    saveOption(showHScrollEl, editor.renderer.getHScrollBarAlwaysVisible());
-    saveOption(animateScrollEl, editor.getAnimatedScroll());
-    saveOption(softTabEl, session.getUseSoftTabs());
-    saveOption(behavioursEl, editor.getBehavioursEnabled());
+    selectStyleEl.checked = editor.getSelectionStyle() == "line";
+    themeEl.value = editor.getTheme();
+    highlightActiveEl.checked = editor.getHighlightActiveLine();
+    showHiddenEl.checked = editor.getShowInvisibles();
+    showGutterEl.checked = editor.renderer.getShowGutter();
+    showPrintMarginEl.checked = editor.renderer.getShowPrintMargin();
+    highlightSelectedWordE.checked = editor.getHighlightSelectedWord();
+    showHScrollEl.checked = editor.renderer.getHScrollBarAlwaysVisible();
+    softTabEl.checked = session.getUseSoftTabs();
+    behavioursEl.checked = editor.getBehavioursEnabled();
 }
 
-themelist.themes.forEach(function(x){ x.value = x.theme });
-fillDropdown(themeEl, {
-    Bright: themelist.themes.filter(function(x){return !x.isDark}),
-    Dark: themelist.themes.filter(function(x){return x.isDark}),
+bindDropdown("mode", function(value) {
+    env.editor.getSession().setMode(modesByName[value].mode || modesByName.text.mode);
 });
-
-event.addListener(themeEl, "mouseover", function(e){
-    themeEl.desiredValue = e.target.value;
-    if (!themeEl.$timer)
-        themeEl.$timer = setTimeout(themeEl.updateTheme);
-});
-
-event.addListener(themeEl, "mouseout", function(e){
-    themeEl.desiredValue = null;
-    if (!themeEl.$timer)
-        themeEl.$timer = setTimeout(themeEl.updateTheme, 20);
-});
-
-themeEl.updateTheme = function(){
-    env.split.setTheme((themeEl.desiredValue || themeEl.selectedValue));
-    themeEl.$timer = null;
-};
 
 bindDropdown("theme", function(value) {
-    if (!value)
-        return;
-    env.editor.setTheme(value);
-    themeEl.selectedValue = value;
+    if (window.require.packaged) {
+        loadTheme(value, function() {
+            env.editor.setTheme(value);
+        });
+    }
+    else {
+        env.editor.setTheme(value);
+    }
 });
 
 bindDropdown("keybinding", function(value) {
@@ -409,17 +368,34 @@ bindDropdown("fontsize", function(value) {
     env.split.setFontSize(value);
 });
 
-bindDropdown("folding", function(value) {
-    env.editor.session.setFoldStyle(value);
-    env.editor.setShowFoldWidgets(value !== "manual");
-});
-
 bindDropdown("soft_wrap", function(value) {
-    env.editor.setOption("wrap", value);
+    var session = env.editor.getSession();
+    var renderer = env.editor.renderer;
+    switch (value) {
+        case "off":
+            session.setUseWrapMode(false);
+            renderer.setPrintMarginColumn(80);
+            break;
+        case "40":
+            session.setUseWrapMode(true);
+            session.setWrapLimitRange(40, 40);
+            renderer.setPrintMarginColumn(40);
+            break;
+        case "80":
+            session.setUseWrapMode(true);
+            session.setWrapLimitRange(80, 80);
+            renderer.setPrintMarginColumn(80);
+            break;
+        case "free":
+            session.setUseWrapMode(true);
+            session.setWrapLimitRange(null, null);
+            renderer.setPrintMarginColumn(80);
+            break;
+    }
 });
 
 bindCheckbox("select_style", function(checked) {
-    env.editor.setOption("selectionStyle", checked ? "line" : "text");
+    env.editor.setSelectionStyle(checked ? "line" : "text");
 });
 
 bindCheckbox("highlight_active", function(checked) {
@@ -428,10 +404,6 @@ bindCheckbox("highlight_active", function(checked) {
 
 bindCheckbox("show_hidden", function(checked) {
     env.editor.setShowInvisibles(checked);
-});
-
-bindCheckbox("display_indent_guides", function(checked) {
-    env.editor.setDisplayIndentGuides(checked);
 });
 
 bindCheckbox("show_gutter", function(checked) {
@@ -447,139 +419,144 @@ bindCheckbox("highlight_selected_word", function(checked) {
 });
 
 bindCheckbox("show_hscroll", function(checked) {
-    env.editor.setOption("hScrollBarAlwaysVisible", checked);
-});
-
-bindCheckbox("show_vscroll", function(checked) {
-    env.editor.setOption("vScrollBarAlwaysVisible", checked);
-});
-
-bindCheckbox("animate_scroll", function(checked) {
-    env.editor.setAnimatedScroll(checked);
+    env.editor.renderer.setHScrollBarAlwaysVisible(checked);
 });
 
 bindCheckbox("soft_tab", function(checked) {
-    env.editor.session.setUseSoftTabs(checked);
+    env.editor.getSession().setUseSoftTabs(checked);
 });
 
 bindCheckbox("enable_behaviours", function(checked) {
     env.editor.setBehavioursEnabled(checked);
 });
 
-bindCheckbox("fade_fold_widgets", function(checked) {
-    env.editor.setFadeFoldWidgets(checked);
-});
-bindCheckbox("read_only", function(checked) {
-    env.editor.setReadOnly(checked);
-});
-bindCheckbox("scrollPastEnd", function(checked) {
-    env.editor.setOption("scrollPastEnd", checked);
-});
-
+var secondSession = null;
 bindDropdown("split", function(value) {
     var sp = env.split;
     if (value == "none") {
+        if (sp.getSplits() == 2) {
+            secondSession = sp.getEditor(1).session;
+        }
         sp.setSplits(1);
     } else {
         var newEditor = (sp.getSplits() == 1);
-        sp.setOrientation(value == "below" ? sp.BELOW : sp.BESIDE);
+        if (value == "below") {
+            sp.setOriantation(sp.BELOW);
+        } else {
+            sp.setOriantation(sp.BESIDE);
+        }
         sp.setSplits(2);
 
         if (newEditor) {
-            var session = sp.getEditor(0).session;
+            var session = secondSession || sp.getEditor(0).session;
             var newSession = sp.setSession(session, 1);
             newSession.name = session.name;
         }
     }
 });
 
-
-bindCheckbox("elastic_tabstops", function(checked) {
-    env.editor.setOption("useElasticTabstops", checked);
-});
-
-var iSearchCheckbox = bindCheckbox("isearch", function(checked) {
-    env.editor.setOption("useIncrementalSearch", checked);
-});
-
-env.editor.addEventListener('incrementalSearchSettingChanged', function(event) {
-    iSearchCheckbox.checked = event.isEnabled;
-});
-
-
-function synchroniseScrolling() {
-    var s1 = env.split.$editors[0].session;
-    var s2 = env.split.$editors[1].session;
-    s1.on('changeScrollTop', function(pos) {s2.setScrollTop(pos)});
-    s2.on('changeScrollTop', function(pos) {s1.setScrollTop(pos)});
-    s1.on('changeScrollLeft', function(pos) {s2.setScrollLeft(pos)});
-    s2.on('changeScrollLeft', function(pos) {s1.setScrollLeft(pos)});
+function bindCheckbox(id, callback) {
+    var el = document.getElementById(id);
+    var onCheck = function() {
+        callback(!!el.checked);
+    };
+    el.onclick = onCheck;
+    onCheck();
 }
 
-bindCheckbox("highlight_token", function(checked) {
-    var editor = env.editor;
-    if (editor.tokenTooltip && !checked) {
-        editor.tokenTooltip.destroy();
-        delete editor.tokenTooltip;
-    } else if (checked) {
-        editor.tokenTooltip = new TokenTooltip(editor);
+function bindDropdown(id, callback) {
+    var el = document.getElementById(id);
+    var onChange = function() {
+        callback(el.value);
+    };
+    el.onchange = onChange;
+    onChange();
+}
+
+function onResize() {
+    var left = env.split.$container.offsetLeft;
+    var width = document.documentElement.clientWidth - left;
+    container.style.width = width + "px";
+    container.style.height = document.documentElement.clientHeight + "px";
+    env.split.resize();
+//        env.editor.resize();
+}
+
+window.onresize = onResize;
+env.editor.renderer.onResize(true);
+
+event.addListener(container, "dragover", function(e) {
+    return event.preventDefault(e);
+});
+
+event.addListener(container, "drop", function(e) {
+    var file;
+    try {
+        file = e.dataTransfer.files[0];
+    } catch(err) {
+        return event.stopEvent();
+    }
+
+    if (window.FileReader) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            env.editor.getSelection().selectAll();
+
+            var mode = modesByName.text;
+            for (var i = 0; i < modes.length; i++) {
+                if (modes[i].supportsFile(file.name)) {
+                    mode = modes[i];
+                    break;
+                }
+            }
+
+            env.editor.onTextInput(reader.result);
+
+            modeEl.value = mode.name;
+            env.editor.getSession().setMode(mode.mode);
+        };
+        reader.readAsText(file);
+    }
+
+    return event.preventDefault(e);
+});
+
+/**
+ * This demonstrates how you can define commands and bind shortcuts to them.
+ */
+
+// Fake-Save, works from the editor and the command line.
+var commands = env.editor.commands;
+
+commands.addCommand({
+    name: "save",
+    bindKey: {
+        win: "Ctrl-S",
+        mac: "Command-S",
+        sender: "editor"
+    },
+    exec: function() {
+        alert("Fake Save File");
     }
 });
 
-var StatusBar = require("ace/ext/statusbar").StatusBar;
-new StatusBar(env.editor, cmdLine.container);
-
-
-var Emmet = require("ace/ext/emmet");
-net.loadScript("https://cloud9ide.github.io/emmet-core/emmet.js", function() {
-    Emmet.setCore(window.emmet);
-    env.editor.setOption("enableEmmet", true);
-});
-
-
-// require("ace/placeholder").PlaceHolder;
-
-var snippetManager = require("ace/snippets").snippetManager;
-
-env.editSnippets = function() {
-    var sp = env.split;
-    if (sp.getSplits() == 2) {
-        sp.setSplits(1);
-        return;
+// Fake-Print with custom lookup-sender-match function.
+commands.addCommand({
+    name: "print",
+    bindKey: {
+        win: "Ctrl-P",
+        mac: "Command-P",
+        sender: function(env, sender, hashId, keyString) {
+            if (sender == "editor") {
+                return true;
+            } else {
+                alert("Sorry, can only print from the editor");
+            }
+        }
+    },
+    exec: function() {
+        alert("Fake Print File");
     }
-    sp.setSplits(1);
-    sp.setSplits(2);
-    sp.setOrientation(sp.BESIDE);
-    var editor = sp.$editors[1];
-    var id = sp.$editors[0].session.$mode.$id || "";
-    var m = snippetManager.files[id];
-    if (!doclist["snippets/" + id]) {
-        var text = m.snippetText;
-        var s = doclist.initDoc(text, "", {});
-        s.setMode("ace/mode/snippets");
-        doclist["snippets/" + id] = s;
-    }
-    editor.on("blur", function() {
-        m.snippetText = editor.getValue();
-        snippetManager.unregister(m.snippets);
-        m.snippets = snippetManager.parseSnippetFile(m.snippetText, m.scope);
-        snippetManager.register(m.snippets);
-    });
-    sp.$editors[0].once("changeMode", function() {
-        sp.setSplits(1);
-    });
-    editor.setSession(doclist["snippets/" + id], 1);
-    editor.focus();
-};
-
-require("ace/ext/language_tools");
-env.editor.setOptions({
-    enableBasicAutocompletion: true,
-    enableLiveAutocompletion: false,
-    enableSnippets: true
 });
-
-var beautify = require("ace/ext/beautify");
-env.editor.commands.addCommands(beautify.commands);
 
 });

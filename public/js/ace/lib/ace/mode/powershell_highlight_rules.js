@@ -1,18 +1,19 @@
 define(function(require, exports, module) {
-"use strict";
 
 var oop = require("../lib/oop");
+var lang = require("../lib/lang");
+var DocCommentHighlightRules = require("./doc_comment_highlight_rules").DocCommentHighlightRules;
 var TextHighlightRules = require("./text_highlight_rules").TextHighlightRules;
 
 var PowershellHighlightRules = function() {
-
-    var keywords = (
-      "function|if|else|elseif|switch|while|default|for|do|until|break|continue|" +
-       "foreach|return|filter|in|trap|throw|param|begin|process|end"
+    
+    var keywords = lang.arrayToMap(
+      ("function|if|else|elseif|switch|while|default|for|do|until|break|continue|" + 
+       "foreach|return|filter|in|trap|throw|param|begin|process|end").split("|")
     );
 
-    var builtinFunctions = (
-      "Get-Alias|Import-Alias|New-Alias|Set-Alias|Get-AuthenticodeSignature|Set-AuthenticodeSignature|" +
+    var builtinFunctions = lang.arrayToMap(
+      ("Get-Alias|Import-Alias|New-Alias|Set-Alias|Get-AuthenticodeSignature|Set-AuthenticodeSignature|" +
        "Set-Location|Get-ChildItem|Clear-Item|Get-Command|Measure-Command|Trace-Command|" +
        "Add-Computer|Checkpoint-Computer|Remove-Computer|Restart-Computer|Restore-Computer|Stop-Computer|" +
        "Reset-ComputerMachinePassword|Test-ComputerSecureChannel|Add-Content|Get-Content|Set-Content|Clear-Content|" +
@@ -52,18 +53,12 @@ var PowershellHighlightRules = function() {
        "Write-Output|Write-Progress|Write-Verbose|Write-Warning|Set-WmiInstance|Invoke-WmiMethod|" +
        "Get-WmiObject|Remove-WmiObject|Connect-WSMan|Disconnect-WSMan|Test-WSMan|Invoke-WSManAction|" +
        "Disable-WSManCredSSP|Enable-WSManCredSSP|Get-WSManCredSSP|New-WSManInstance|Get-WSManInstance|Set-WSManInstance|" +
-       "Remove-WSManInstance|Set-WSManQuickConfig|New-WSManSessionOption"
-       );
-
-    var keywordMapper = this.createKeywordMapper({
-        "support.function": builtinFunctions,
-        "keyword": keywords
-    }, "identifier");
+       "Remove-WSManInstance|Set-WSManQuickConfig|New-WSManSessionOption").split("|"));
 
     var binaryOperatorsRe = "eq|ne|ge|gt|lt|le|like|notlike|match|notmatch|replace|contains|notcontains|" +
                             "ieq|ine|ige|igt|ile|ilt|ilike|inotlike|imatch|inotmatch|ireplace|icontains|inotcontains|" +
                             "is|isnot|as|" +
-                            "and|or|band|bor|not";
+                            "and|or|band|bor|not"; 
 
     // regexp must not have capturing parentheses. Use (?:) instead.
     // regexps are ordered -> the first match is used
@@ -73,10 +68,6 @@ var PowershellHighlightRules = function() {
             {
                 token : "comment",
                 regex : "#.*$"
-            }, {
-                token : "comment.start",
-                regex : "<#",
-                next : "comment"
             }, {
                 token : "string", // single line
                 regex : '["](?:(?:\\\\.)|(?:[^"\\\\]))*?["]'
@@ -99,7 +90,14 @@ var PowershellHighlightRules = function() {
                 token : "variable.instance",
                 regex : "[$][a-zA-Z][a-zA-Z0-9_]*\\b"
             }, {
-                token : keywordMapper,
+                token : function(value) {
+                    if (keywords.hasOwnProperty(value))
+                        return "keyword";
+                    else if (builtinFunctions.hasOwnProperty(value))
+                        return "support.function";
+                    else
+                        return "identifier";
+                },
                 // TODO: Unicode escape sequences
                 // TODO: Unicode identifiers
                 regex : "[a-zA-Z_$][a-zA-Z0-9_$\\-]*\\b"
@@ -122,18 +120,13 @@ var PowershellHighlightRules = function() {
         ],
         "comment" : [
             {
-                token : "comment.end",
-                regex : "#>",
+                token : "comment", // closing comment
+                regex : ".*?\\*\\/",
                 next : "start"
             }, {
-                token : "doc.comment.tag",
-                regex : "^\\.\\w+"
-            }, {
-                token : "comment",
-                regex : "\\w+"
-            }, {
-                token : "comment",
-                regex : "."
+                token : "comment", // comment spanning whole line
+                merge : true,
+                regex : ".+"
             }
         ]
     };

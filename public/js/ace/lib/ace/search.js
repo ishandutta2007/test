@@ -1,400 +1,339 @@
-/* ***** BEGIN LICENSE BLOCK *****
- * Distributed under the BSD license:
+/* vim:ts=4:sts=4:sw=4:
+ * ***** BEGIN LICENSE BLOCK *****
+ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
- * Copyright (c) 2010, Ajax.org B.V.
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Ajax.org B.V. nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL AJAX.ORG B.V. BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
+ *
+ * The Original Code is Ajax.org Code Editor (ACE).
+ *
+ * The Initial Developer of the Original Code is
+ * Ajax.org B.V.
+ * Portions created by the Initial Developer are Copyright (C) 2010
+ * the Initial Developer. All Rights Reserved.
+ *
+ * Contributor(s):
+ *      Fabian Jakobs <fabian AT ajax DOT org>
+ *      Mihai Sucan <mihai DOT sucan AT gmail DOT com>
+ *
+ * Alternatively, the contents of this file may be used under the terms of
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * in which case the provisions of the GPL or the LGPL are applicable instead
+ * of those above. If you wish to allow use of your version of this file only
+ * under the terms of either the GPL or the LGPL, and not to allow others to
+ * use your version of this file under the terms of the MPL, indicate your
+ * decision by deleting the provisions above and replace them with the notice
+ * and other provisions required by the GPL or the LGPL. If you do not delete
+ * the provisions above, a recipient may use your version of this file under
+ * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
 
 define(function(require, exports, module) {
-"use strict";
 
 var lang = require("./lib/lang");
 var oop = require("./lib/oop");
 var Range = require("./range").Range;
 
-/**
- * @class Search
- *
- * A class designed to handle all sorts of text searches within a [[Document `Document`]].
- *
- **/
-
-/**
- * 
- *
- * Creates a new `Search` object. The following search options are avaliable:
- *
- * - `needle`: The string or regular expression you're looking for
- * - `backwards`: Whether to search backwards from where cursor currently is. Defaults to `false`.
- * - `wrap`: Whether to wrap the search back to the beginning when it hits the end. Defaults to `false`.
- * - `caseSensitive`: Whether the search ought to be case-sensitive. Defaults to `false`.
- * - `wholeWord`: Whether the search matches only on whole words. Defaults to `false`.
- * - `range`: The [[Range]] to search within. Set this to `null` for the whole document
- * - `regExp`: Whether the search is a regular expression or not. Defaults to `false`.
- * - `start`: The starting [[Range]] or cursor position to begin the search
- * - `skipCurrent`: Whether or not to include the current line in the search. Default to `false`.
- * 
- * @constructor
- **/
-
 var Search = function() {
-    this.$options = {};
+    this.$options = {
+        needle: "",
+        backwards: false,
+        wrap: false,
+        caseSensitive: false,
+        wholeWord: false,
+        scope: Search.ALL,
+        regExp: false
+    };
 };
 
+Search.ALL = 1;
+Search.SELECTION = 2;
+
 (function() {
-    /**
-     * Sets the search options via the `options` parameter.
-     * @param {Object} options An object containing all the new search properties
-     *
-     * 
-     * @returns {Search}
-     * @chainable
-    **/
+
     this.set = function(options) {
         oop.mixin(this.$options, options);
         return this;
     };
-
-    /**
-     * [Returns an object containing all the search options.]{: #Search.getOptions}
-     * @returns {Object}
-    **/
+    
     this.getOptions = function() {
         return lang.copyObject(this.$options);
     };
-    
-    /**
-     * Sets the search options via the `options` parameter.
-     * @param {Object} An object containing all the search propertie
-     * @related Search.set
-    **/
-    this.setOptions = function(options) {
-        this.$options = options;
-    };
-    /**
-     * Searches for `options.needle`. If found, this method returns the [[Range `Range`]] where the text first occurs. If `options.backwards` is `true`, the search goes backwards in the session.
-     * @param {EditSession} session The session to search with
-     *
-     * 
-     * @returns {Range}
-    **/
+
     this.find = function(session) {
-        var options = this.$options;
-        var iterator = this.$matchIterator(session, options);
-        if (!iterator)
-            return false;
+        if (!this.$options.needle)
+            return null;
+
+        if (this.$options.backwards) {
+            var iterator = this.$backwardMatchIterator(session);
+        } else {
+            iterator = this.$forwardMatchIterator(session);
+        }
 
         var firstRange = null;
-        iterator.forEach(function(range, row, offset) {
-            if (!range.start) {
-                var column = range.offset + (offset || 0);
-                firstRange = new Range(row, column, row, column + range.length);
-                if (!range.length && options.start && options.start.start
-                    && options.skipCurrent != false && firstRange.isEqual(options.start)
-                ) {
-                    firstRange = null;
-                    return false;
-                }
-            } else
-                firstRange = range;
+        iterator.forEach(function(range) {
+            firstRange = range;
             return true;
         });
 
         return firstRange;
     };
 
-    /**
-     * Searches for all occurances `options.needle`. If found, this method returns an array of [[Range `Range`s]] where the text first occurs. If `options.backwards` is `true`, the search goes backwards in the session.
-     * @param {EditSession} session The session to search with
-     *
-     * 
-     * @returns {[Range]}
-    **/
     this.findAll = function(session) {
         var options = this.$options;
         if (!options.needle)
             return [];
-        this.$assembleRegExp(options);
 
-        var range = options.range;
-        var lines = range
-            ? session.getLines(range.start.row, range.end.row)
-            : session.doc.getAllLines();
+        if (options.backwards) {
+            var iterator = this.$backwardMatchIterator(session);
+        } else {
+            iterator = this.$forwardMatchIterator(session);
+        }
+
+        var ignoreCursor = !options.start && options.wrap && options.scope == Search.ALL;
+        if (ignoreCursor)
+            options.start = {row: 0, column: 0};
 
         var ranges = [];
-        var re = options.re;
-        if (options.$isMultiLine) {
-            var len = re.length;
-            var maxRow = lines.length - len;
-            var prevRange;
-            outer: for (var row = re.offset || 0; row <= maxRow; row++) {
-                for (var j = 0; j < len; j++)
-                    if (lines[row + j].search(re[j]) == -1)
-                        continue outer;
-                
-                var startLine = lines[row];
-                var line = lines[row + len - 1];
-                var startIndex = startLine.length - startLine.match(re[0])[0].length;
-                var endIndex = line.match(re[len - 1])[0].length;
-                
-                if (prevRange && prevRange.end.row === row &&
-                    prevRange.end.column > startIndex
-                ) {
-                    continue;
-                }
-                ranges.push(prevRange = new Range(
-                    row, startIndex, row + len - 1, endIndex
-                ));
-                if (len > 2)
-                    row = row + len - 2;
-            }
-        } else {
-            for (var i = 0; i < lines.length; i++) {
-                var matches = lang.getMatchOffsets(lines[i], re);
-                for (var j = 0; j < matches.length; j++) {
-                    var match = matches[j];
-                    ranges.push(new Range(i, match.offset, i, match.offset + match.length));
-                }
-            }
-        }
+        iterator.forEach(function(range) {
+            ranges.push(range);
+        });
 
-        if (range) {
-            var startColumn = range.start.column;
-            var endColumn = range.start.column;
-            var i = 0, j = ranges.length - 1;
-            while (i < j && ranges[i].start.column < startColumn && ranges[i].start.row == range.start.row)
-                i++;
-
-            while (i < j && ranges[j].end.column > endColumn && ranges[j].end.row == range.end.row)
-                j--;
-            
-            ranges = ranges.slice(i, j + 1);
-            for (i = 0, j = ranges.length; i < j; i++) {
-                ranges[i].start.row += range.start.row;
-                ranges[i].end.row += range.start.row;
-            }
-        }
+        if (ignoreCursor)
+            options.start = null;
 
         return ranges;
     };
 
-    /**
-     * Searches for `options.needle` in `input`, and, if found, replaces it with `replacement`.
-     * @param {String} input The text to search in
-     * @param {String} replacement The replacing text
-     * + (String): If `options.regExp` is `true`, this function returns `input` with the replacement already made. Otherwise, this function just returns `replacement`.<br/>
-     * If `options.needle` was not found, this function returns `null`.
-     *
-     * 
-     * @returns {String}
-    **/
     this.replace = function(input, replacement) {
-        var options = this.$options;
-
-        var re = this.$assembleRegExp(options);
-        if (options.$isMultiLine)
-            return replacement;
-
-        if (!re)
-            return;
-
+        var re = this.$assembleRegExp();
         var match = re.exec(input);
-        if (!match || match[0].length != input.length)
-            return null;
-        
-        replacement = input.replace(re, replacement);
-        if (options.preserveCase) {
-            replacement = replacement.split("");
-            for (var i = Math.min(input.length, input.length); i--; ) {
-                var ch = input[i];
-                if (ch && ch.toLowerCase() != ch)
-                    replacement[i] = replacement[i].toUpperCase();
-                else
-                    replacement[i] = replacement[i].toLowerCase();
+        if (match && match[0].length == input.length) {
+            if (this.$options.regExp) {
+                return input.replace(re, replacement);
+            } else {
+                return replacement;
             }
-            replacement = replacement.join("");
+        } else {
+            return null;
         }
-        
-        return replacement;
     };
 
-    this.$matchIterator = function(session, options) {
-        var re = this.$assembleRegExp(options);
-        if (!re)
-            return false;
-
-        var callback;
-        if (options.$isMultiLine) {
-            var len = re.length;
-            var matchIterator = function(line, row, offset) {
-                var startIndex = line.search(re[0]);
-                if (startIndex == -1)
-                    return;
-                for (var i = 1; i < len; i++) {
-                    line = session.getLine(row + i);
-                    if (line.search(re[i]) == -1)
-                        return;
-                }
-
-                var endIndex = line.match(re[len - 1])[0].length;
-
-                var range = new Range(row, startIndex, row + len - 1, endIndex);
-                if (re.offset == 1) {
-                    range.start.row--;
-                    range.start.column = Number.MAX_VALUE;
-                } else if (offset)
-                    range.start.column += offset;
-
-                if (callback(range))
-                    return true;
-            };
-        } else if (options.backwards) {
-            var matchIterator = function(line, row, startIndex) {
-                var matches = lang.getMatchOffsets(line, re);
-                for (var i = matches.length-1; i >= 0; i--)
-                    if (callback(matches[i], row, startIndex))
-                        return true;
-            };
-        } else {
-            var matchIterator = function(line, row, startIndex) {
-                var matches = lang.getMatchOffsets(line, re);
-                for (var i = 0; i < matches.length; i++)
-                    if (callback(matches[i], row, startIndex))
-                        return true;
-            };
-        }
-        
-        var lineIterator = this.$lineIterator(session, options);
+    this.$forwardMatchIterator = function(session) {
+        var re = this.$assembleRegExp();
+        var self = this;
 
         return {
-            forEach: function(_callback) {
-                callback = _callback;
-                lineIterator.forEach(matchIterator);
+            forEach: function(callback) {
+                self.$forwardLineIterator(session).forEach(function(line, startIndex, row) {
+                    if (startIndex) {
+                        line = line.substring(startIndex);
+                    }
+
+                    var matches = [];
+
+                    line.replace(re, function(str) {
+                        var offset = arguments[arguments.length-2];
+                        matches.push({
+                            str: str,
+                            offset: startIndex + offset
+                        });
+                        return str;
+                    });
+
+                    for (var i=0; i<matches.length; i++) {
+                        var match = matches[i];
+                        var range = self.$rangeFromMatch(row, match.offset, match.str.length);
+                        if (callback(range))
+                            return true;
+                    }
+
+                });
             }
         };
     };
 
-    this.$assembleRegExp = function(options, $disableFakeMultiline) {
-        if (options.needle instanceof RegExp)
-            return options.re = options.needle;
+    this.$backwardMatchIterator = function(session) {
+        var re = this.$assembleRegExp();
+        var self = this;
 
-        var needle = options.needle;
+        return {
+            forEach: function(callback) {
+                self.$backwardLineIterator(session).forEach(function(line, startIndex, row) {
+                    if (startIndex) {
+                        line = line.substring(startIndex);
+                    }
 
-        if (!options.needle)
-            return options.re = false;
+                    var matches = [];
 
-        if (!options.regExp)
-            needle = lang.escapeRegExp(needle);
+                    line.replace(re, function(str, offset) {
+                        matches.push({
+                            str: str,
+                            offset: startIndex + offset
+                        });
+                        return str;
+                    });
 
-        if (options.wholeWord)
-            needle = "\\b" + needle + "\\b";
-
-        var modifier = options.caseSensitive ? "gm" : "gmi";
-
-        options.$isMultiLine = !$disableFakeMultiline && /[\n\r]/.test(needle);
-        if (options.$isMultiLine)
-            return options.re = this.$assembleMultilineRegExp(needle, modifier);
-
-        try {
-            var re = new RegExp(needle, modifier);
-        } catch(e) {
-            re = false;
-        }
-        return options.re = re;
+                    for (var i=matches.length-1; i>= 0; i--) {
+                        var match = matches[i];
+                        var range = self.$rangeFromMatch(row, match.offset, match.str.length);
+                        if (callback(range))
+                            return true;
+                    }
+                });
+            }
+        };
     };
 
-    this.$assembleMultilineRegExp = function(needle, modifier) {
-        var parts = needle.replace(/\r\n|\r|\n/g, "$\n^").split("\n");
-        var re = [];
-        for (var i = 0; i < parts.length; i++) try {
-            re.push(new RegExp(parts[i], modifier));
-        } catch(e) {
-            return false;
-        }
-        if (parts[0] == "") {
-            re.shift();
-            re.offset = 1;
+    this.$rangeFromMatch = function(row, column, length) {
+        return new Range(row, column, row, column+length);
+    };
+
+    this.$assembleRegExp = function() {
+        if (this.$options.regExp) {
+            var needle = this.$options.needle;
         } else {
-            re.offset = 0;
+            needle = lang.escapeRegExp(this.$options.needle);
         }
+
+        if (this.$options.wholeWord) {
+            needle = "\\b" + needle + "\\b";
+        }
+
+        var modifier = "g";
+        if (!this.$options.caseSensitive) {
+            modifier += "i";
+        }
+
+        var re = new RegExp(needle, modifier);
         return re;
     };
 
-    this.$lineIterator = function(session, options) {
-        var backwards = options.backwards == true;
-        var skipCurrent = options.skipCurrent != false;
+    this.$forwardLineIterator = function(session) {
+        var searchSelection = this.$options.scope == Search.SELECTION;
 
-        var range = options.range;
-        var start = options.start;
-        if (!start)
-            start = range ? range[backwards ? "end" : "start"] : session.selection.getRange();
-         
-        if (start.start)
-            start = start[skipCurrent != backwards ? "end" : "start"];
+        var range = this.$options.range || session.getSelection().getRange();
+        var start = this.$options.start || session.getSelection().getCursor();
 
-        var firstRow = range ? range.start.row : 0;
-        var lastRow = range ? range.end.row : session.getLength() - 1;
+        var firstRow = searchSelection ? range.start.row : 0;
+        var firstColumn = searchSelection ? range.start.column : 0;
+        var lastRow = searchSelection ? range.end.row : session.getLength() - 1;
 
-        var forEach = backwards ? function(callback) {
+        var wrap = this.$options.wrap;
+        var inWrap = false;
+
+        function getLine(row) {
+            var line = session.getLine(row);
+            if (searchSelection && row == range.end.row) {
+                line = line.substring(0, range.end.column);
+            }
+            if (inWrap && row == start.row) {
+                line = line.substring(0, start.column);
+            }
+            return line;
+        }
+
+        return {
+            forEach: function(callback) {
+                var row = start.row;
+
+                var line = getLine(row);
+                var startIndex = start.column;
+
+                var stop = false;
+                inWrap = false;
+
+                while (!callback(line, startIndex, row)) {
+
+                    if (stop) {
+                        return;
+                    }
+
+                    row++;
+                    startIndex = 0;
+
+                    if (row > lastRow) {
+                        if (wrap) {
+                            row = firstRow;
+                            startIndex = firstColumn;
+                            inWrap = true;
+                        } else {
+                            return;
+                        }
+                    }
+
+                    if (row == start.row)
+                        stop = true;
+
+                    line = getLine(row);
+                }
+            }
+        };
+    };
+
+    this.$backwardLineIterator = function(session) {
+        var searchSelection = this.$options.scope == Search.SELECTION;
+
+        var range = this.$options.range || session.getSelection().getRange();
+        var start = this.$options.start || session.getSelection().getCursor();
+
+        var firstRow = searchSelection ? range.start.row : 0;
+        var firstColumn = searchSelection ? range.start.column : 0;
+        var lastRow = searchSelection ? range.end.row : session.getLength() - 1;
+
+        var wrap = this.$options.wrap;
+
+        return {
+            forEach : function(callback) {
                 var row = start.row;
 
                 var line = session.getLine(row).substring(0, start.column);
-                if (callback(line, row))
-                    return;
+                var startIndex = 0;
+                var stop = false;
+                var inWrap = false;
 
-                for (row--; row >= firstRow; row--)
-                    if (callback(session.getLine(row), row))
+                while (!callback(line, startIndex, row)) {
+
+                    if (stop)
                         return;
 
-                if (options.wrap == false)
-                    return;
+                    row--;
+                    startIndex = 0;
 
-                for (row = lastRow, firstRow = start.row; row >= firstRow; row--)
-                    if (callback(session.getLine(row), row))
-                        return;
-            } : function(callback) {
-                var row = start.row;
+                    if (row < firstRow) {
+                        if (wrap) {
+                            row = lastRow;
+                            inWrap = true;
+                        } else {
+                            return;
+                        }
+                    }
 
-                var line = session.getLine(row).substr(start.column);
-                if (callback(line, row, start.column))
-                    return;
+                    if (row == start.row)
+                        stop = true;
 
-                for (row = row+1; row <= lastRow; row++)
-                    if (callback(session.getLine(row), row))
-                        return;
+                    line = session.getLine(row);
+                    if (searchSelection) {
+                        if (row == firstRow)
+                            startIndex = firstColumn;
+                        else if (row == lastRow)
+                            line = line.substring(0, range.end.column);
+                    }
 
-                if (options.wrap == false)
-                    return;
-
-                for (row = firstRow, lastRow = start.row; row <= lastRow; row++)
-                    if (callback(session.getLine(row), row))
-                        return;
-            };
-        
-        return {forEach: forEach};
+                    if (inWrap && row == start.row)
+                        startIndex = start.column;
+                }
+            }
+        };
     };
 
 }).call(Search.prototype);

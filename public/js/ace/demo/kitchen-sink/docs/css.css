@@ -1,18 +1,5 @@
 .text-layer {
-    font: 12px Monaco, "Courier New", monospace;
+    font-family: Monaco, "Courier New", monospace;
+    font-size: 12px;
     cursor: text;
-}
-
-.blinker {
-    animation: blink 1s linear infinite alternate;
-}
-
-@keyframes blink {
-    0%, 40% {
-        opacity: 0;
-    }
-
-    40.5%, 100% {
-        opacity: 1
-    }
 }

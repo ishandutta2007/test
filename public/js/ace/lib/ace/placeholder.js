@@ -1,54 +1,44 @@
 /* ***** BEGIN LICENSE BLOCK *****
- * Distributed under the BSD license:
+ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
- * Copyright (c) 2010, Ajax.org B.V.
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Ajax.org B.V. nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL AJAX.ORG B.V. BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
+ *
+ * The Original Code is Ajax.org Code Editor (ACE).
+ *
+ * The Initial Developer of the Original Code is
+ * Ajax.org B.V.
+ * Portions created by the Initial Developer are Copyright (C) 2010
+ * the Initial Developer. All Rights Reserved.
+ *
+ * Contributor(s):
+ *      Zef Hemel <zef@c9.io>
+ *
+ * Alternatively, the contents of this file may be used under the terms of
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * in which case the provisions of the GPL or the LGPL are applicable instead
+ * of those above. If you wish to allow use of your version of this file only
+ * under the terms of either the GPL or the LGPL, and not to allow others to
+ * use your version of this file under the terms of the MPL, indicate your
+ * decision by deleting the provisions above and replace them with the notice
+ * and other provisions required by the GPL or the LGPL. If you do not delete
+ * the provisions above, a recipient may use your version of this file under
+ * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
 define(function(require, exports, module) {
-"use strict";
 
-var Range = require("./range").Range;
+var Range = require('./range').Range;
 var EventEmitter = require("./lib/event_emitter").EventEmitter;
 var oop = require("./lib/oop");
-
-/**
- * @class PlaceHolder
- *
- **/
-
-/**
- * - session (Document): The document to associate with the anchor
- * - length (Number): The starting row position
- * - pos (Number): The starting column position
- * - others (String):
- * - mainClass (String):
- * - othersClass (String):
- * 
- * @constructor
- **/
 
 var PlaceHolder = function(session, length, pos, others, mainClass, othersClass) {
     var _self = this;
@@ -68,9 +58,6 @@ var PlaceHolder = function(session, length, pos, others, mainClass, othersClass)
     };
     
     this.$pos = pos;
-    // Used for reset
-    var undoStack = session.getUndoManager().$undoStack || session.getUndoManager().$undostack || {length: -1};
-    this.$undoStackDepth =  undoStack.length;
     this.setup();
 
     session.selection.on("changeCursor", this.$onCursorChange);
@@ -80,21 +67,11 @@ var PlaceHolder = function(session, length, pos, others, mainClass, othersClass)
 
     oop.implement(this, EventEmitter);
 
-    /**
-     * PlaceHolder.setup()
-     *
-     * TODO
-     *
-     **/
     this.setup = function() {
         var _self = this;
         var doc = this.doc;
         var session = this.session;
         var pos = this.$pos;
-        
-        this.selectionBefore = session.selection.toJSON();
-        if (session.selection.inMultiSelectMode)
-            session.selection.toSingleRange();
 
         this.pos = doc.createAnchor(pos.row, pos.column);
         this.markerId = session.addMarker(new Range(pos.row, pos.column, pos.row, pos.column + this.length), this.mainClass, null, false);
@@ -107,15 +84,8 @@ var PlaceHolder = function(session, length, pos, others, mainClass, othersClass)
             var anchor = doc.createAnchor(other.row, other.column);
             _self.others.push(anchor);
         });
-        session.setUndoSelect(false);
     };
     
-    /**
-     * PlaceHolder.showOtherMarkers()
-     *
-     * TODO
-     *
-     **/
     this.showOtherMarkers = function() {
         if(this.othersActive) return;
         var session = this.session;
@@ -130,12 +100,6 @@ var PlaceHolder = function(session, length, pos, others, mainClass, othersClass)
         });
     };
     
-    /**
-     * PlaceHolder.hideOtherMarkers()
-     *
-     * Hides all over markers in the [[EditSession `EditSession`]] that are not the currently selected one.
-     *
-     **/
     this.hideOtherMarkers = function() {
         if(!this.othersActive) return;
         this.othersActive = false;
@@ -144,19 +108,11 @@ var PlaceHolder = function(session, length, pos, others, mainClass, othersClass)
         }
     };
 
-    /**
-     * PlaceHolder@onUpdate(e)
-     * 
-     * Emitted when the place holder updates.
-     *
-     **/
     this.onUpdate = function(event) {
         var delta = event.data;
         var range = delta.range;
         if(range.start.row !== range.end.row) return;
         if(range.start.row !== this.pos.row) return;
-        if (this.$updating) return;
-        this.$updating = true;
         var lengthDiff = delta.action === "insertText" ? range.end.column - range.start.column : range.start.column - range.end.column;
         
         if(range.start.column >= this.pos.column && range.start.column <= this.pos.column + this.length + 1) {
@@ -204,39 +160,24 @@ var PlaceHolder = function(session, length, pos, others, mainClass, othersClass)
                     }.bind(this), 0);
                 }
             }
-            this.pos._emit("change", {value: this.pos});
+            this.pos._dispatchEvent("change", {value: this.pos});
             for (var i = 0; i < this.others.length; i++) {
-                this.others[i]._emit("change", {value: this.others[i]});
+                this.others[i]._dispatchEvent("change", {value: this.others[i]});
             }
         }
-        this.$updating = false;
     };
     
-    /**
-     * PlaceHolder@onCursorChange(e)
-     * 
-     * Emitted when the cursor changes.
-     *
-     **/
-
     this.onCursorChange = function(event) {
-        if (this.$updating || !this.session) return;
         var pos = this.session.selection.getCursor();
-        if (pos.row === this.pos.row && pos.column >= this.pos.column && pos.column <= this.pos.column + this.length) {
+        if(pos.row === this.pos.row && pos.column >= this.pos.column && pos.column <= this.pos.column + this.length) {
             this.showOtherMarkers();
-            this._emit("cursorEnter", event);
+            this._dispatchEvent("cursorEnter", event);
         } else {
             this.hideOtherMarkers();
-            this._emit("cursorLeave", event);
+            this._dispatchEvent("cursorLeave", event);
         }
     };
     
-    /**
-     * PlaceHolder.detach()
-     * 
-     * TODO
-     *
-     **/    
     this.detach = function() {
         this.session.removeMarker(this.markerId);
         this.hideOtherMarkers();
@@ -246,26 +187,6 @@ var PlaceHolder = function(session, length, pos, others, mainClass, othersClass)
         for (var i = 0; i < this.others.length; i++) {
             this.others[i].detach();
         }
-        this.session.setUndoSelect(true);
-        this.session = null;
-    };
-    
-    /**
-     * PlaceHolder.cancel()
-     * 
-     * TODO
-     *
-     **/
-    this.cancel = function() {
-        if(this.$undoStackDepth === -1)
-            throw Error("Canceling placeholders only supported with undo manager attached to session.");
-        var undoManager = this.session.getUndoManager();
-        var undosRequired = (undoManager.$undoStack || undoManager.$undostack).length - this.$undoStackDepth;
-        for (var i = 0; i < undosRequired; i++) {
-            undoManager.undo(true);
-        }
-        if (this.selectionBefore)
-            this.session.selection.fromJSON(this.selectionBefore);
     };
 }).call(PlaceHolder.prototype);
 

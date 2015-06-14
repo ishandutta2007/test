@@ -1,5 +1,3 @@
-"use strict";
-
 var dom     = require('jsdom/lib/jsdom/level2/html').dom.level2.html;
 var browser = require('jsdom/lib/jsdom/browser/index').windowAugmentation(dom);
 

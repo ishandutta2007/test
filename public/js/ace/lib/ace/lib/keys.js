@@ -32,13 +32,10 @@ For more information about SproutCore, visit http://www.sproutcore.com
 // Most of the following code is taken from SproutCore with a few changes.
 
 define(function(require, exports, module) {
-"use strict";
-
-require("./fixoldbrowsers");
 
 var oop = require("./oop");
 
-/*
+/**
  * Helper functions and hashes for key handling.
  */
 var Keys = (function() {
@@ -48,8 +45,8 @@ var Keys = (function() {
         },
 
         KEY_MODS: {
-            "ctrl": 1, "alt": 2, "option" : 2, "shift": 4,
-            "super": 8, "meta": 8, "command": 8, "cmd": 8
+            "ctrl": 1, "alt": 2, "option" : 2,
+            "shift": 4, "meta": 8, "command": 8
         },
 
         FUNCTION_KEYS : {
@@ -70,17 +67,6 @@ var Keys = (function() {
             44 : "Print",
             45 : "Insert",
             46 : "Delete",
-            96 : "Numpad0",
-            97 : "Numpad1",
-            98 : "Numpad2",
-            99 : "Numpad3",
-            100: "Numpad4",
-            101: "Numpad5",
-            102: "Numpad6",
-            103: "Numpad7",
-            104: "Numpad8",
-            105: "Numpad9",
-            '-13': "NumpadEnter",
             112: "F1",
             113: "F2",
             114: "F3",
@@ -104,21 +90,14 @@ var Keys = (function() {
            73: 'i',  74: 'j',  75: 'k',  76: 'l',  77: 'm',  78: 'n', 79:  'o',
            80: 'p',  81: 'q',  82: 'r',  83: 's',  84: 't',  85: 'u', 86:  'v',
            87: 'w',  88: 'x',  89: 'y',  90: 'z', 107: '+', 109: '-', 110: '.',
-          186: ';', 187: '=', 188: ',', 189: '-', 190: '.', 191: '/', 192: '`',
-          219: '[', 220: '\\',221: ']', 222: '\''
+          188: ',', 190: '.', 191: '/', 192: '`', 219: '[', 220: '\\',
+          221: ']', 222: '\"'
         }
     };
 
     // A reverse map of FUNCTION_KEYS
-    var name, i;
-    for (i in ret.FUNCTION_KEYS) {
-        name = ret.FUNCTION_KEYS[i].toLowerCase();
-        ret[name] = parseInt(i, 10);
-    }
-
-    // A reverse map of PRINTABLE_KEYS
-    for (i in ret.PRINTABLE_KEYS) {
-        name = ret.PRINTABLE_KEYS[i].toLowerCase();
+    for (var i in ret.FUNCTION_KEYS) {
+        var name = ret.FUNCTION_KEYS[i].toUpperCase();
         ret[name] = parseInt(i, 10);
     }
 
@@ -128,36 +107,12 @@ var Keys = (function() {
     oop.mixin(ret, ret.PRINTABLE_KEYS);
     oop.mixin(ret, ret.FUNCTION_KEYS);
 
-    // aliases
-    ret.enter = ret["return"];
-    ret.escape = ret.esc;
-    ret.del = ret["delete"];
-
-    // workaround for firefox bug
-    ret[173] = '-';
-    
-    (function() {
-        var mods = ["cmd", "ctrl", "alt", "shift"];
-        for (var i = Math.pow(2, mods.length); i--;) {            
-            ret.KEY_MODS[i] = mods.filter(function(x) {
-                return i & ret.KEY_MODS[x];
-            }).join("-") + "-";
-        }
-    })();
-
-    ret.KEY_MODS[0] = "";
-    ret.KEY_MODS[-1] = "input-";
-
     return ret;
 })();
 oop.mixin(exports, Keys);
 
 exports.keyCodeToString = function(keyCode) {
-    // Language-switching keystroke in Chrome/Linux emits keyCode 0.
-    var keyString = Keys[keyCode];
-    if (typeof keyString != "string")
-        keyString = String.fromCharCode(keyCode);
-    return keyString.toLowerCase();
-};
+    return (Keys[keyCode] || String.fromCharCode(keyCode)).toLowerCase();
+}
 
 });

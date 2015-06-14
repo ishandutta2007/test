@@ -1,18 +1,17 @@
-/*
+
+/**
  * based on code from:
- *
+ * 
  * @license RequireJS text 0.25.0 Copyright (c) 2010-2011, The Dojo Foundation All Rights Reserved.
  * Available via the MIT or new BSD license.
  * see: http://github.com/jrburke/requirejs for details
  */
 define(function(require, exports, module) {
-"use strict";
-var dom = require("./dom");
-
+    
 exports.get = function (url, callback) {
-    var xhr = new XMLHttpRequest();
+    var xhr = exports.createXhr();
     xhr.open('GET', url, true);
-    xhr.onreadystatechange = function () {
+    xhr.onreadystatechange = function (evt) {
         //Do not explicitly handle errors, those should be
         //visible via console output in the browser.
         if (xhr.readyState === 4) {
@@ -22,30 +21,42 @@ exports.get = function (url, callback) {
     xhr.send(null);
 };
 
+var progIds = ['Msxml2.XMLHTTP', 'Microsoft.XMLHTTP', 'Msxml2.XMLHTTP.4.0'];
+
+exports.createXhr = function () {
+    //Would love to dump the ActiveX crap in here. Need IE 6 to die first.
+    var xhr, i, progId;
+    if (typeof XMLHttpRequest !== "undefined") {
+        return new XMLHttpRequest();
+    } else {
+        for (i = 0; i < 3; i++) {
+            progId = progIds[i];
+            try {
+                xhr = new ActiveXObject(progId);
+            } catch (e) {}
+
+            if (xhr) {
+                progIds = [progId];  // so faster next time
+                break;
+            }
+        }
+    }
+
+    if (!xhr) {
+        throw new Error("createXhr(): XMLHttpRequest not available");
+    }
+
+    return xhr;
+};
+
 exports.loadScript = function(path, callback) {
-    var head = dom.getDocumentHead();
+    var head = document.getElementsByTagName('head')[0];
     var s = document.createElement('script');
 
     s.src = path;
     head.appendChild(s);
-
-    s.onload = s.onreadystatechange = function(_, isAbort) {
-        if (isAbort || !s.readyState || s.readyState == "loaded" || s.readyState == "complete") {
-            s = s.onload = s.onreadystatechange = null;
-            if (!isAbort)
-                callback();
-        }
-    };
+    
+    s.onload = callback;
 };
-
-/*
- * Convert a url into a fully qualified absolute URL
- * This function does not work in IE6
- */
-exports.qualifyURL = function(url) {
-    var a = document.createElement('a');
-    a.href = url;
-    return a.href;
-}
 
 });

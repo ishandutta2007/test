@@ -1,60 +1,48 @@
 /* ***** BEGIN LICENSE BLOCK *****
- * Distributed under the BSD license:
+ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
- * Copyright (c) 2010, Ajax.org B.V.
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Ajax.org B.V. nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL AJAX.ORG B.V. BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
+ *
+ * The Original Code is Ajax.org Code Editor (ACE).
+ *
+ * The Initial Developer of the Original Code is
+ * Ajax.org B.V.
+ * Portions created by the Initial Developer are Copyright (C) 2010
+ * the Initial Developer. All Rights Reserved.
+ *
+ * Contributor(s):
+ *      Fabian Jakobs <fabian AT ajax DOT org>
+ *
+ * Alternatively, the contents of this file may be used under the terms of
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * in which case the provisions of the GPL or the LGPL are applicable instead
+ * of those above. If you wish to allow use of your version of this file only
+ * under the terms of either the GPL or the LGPL, and not to allow others to
+ * use your version of this file under the terms of the MPL, indicate your
+ * decision by deleting the provisions above and replace them with the notice
+ * and other provisions required by the GPL or the LGPL. If you do not delete
+ * the provisions above, a recipient may use your version of this file under
+ * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
 
 define(function(require, exports, module) {
-"use strict";
 
 var oop = require("./lib/oop");
 var EventEmitter = require("./lib/event_emitter").EventEmitter;
 
-
-/**
- * Tokenizes the current [[Document `Document`]] in the background, and caches the tokenized rows for future use. 
- * 
- * If a certain row is changed, everything below that row is re-tokenized.
- *
- * @class BackgroundTokenizer
- **/
-
-/**
- * Creates a new `BackgroundTokenizer` object.
- * @param {Tokenizer} tokenizer The tokenizer to use
- * @param {Editor} editor The editor to associate with
- *
- * @constructor
- **/
-
 var BackgroundTokenizer = function(tokenizer, editor) {
-    this.running = false;
+    this.running = false;    
     this.lines = [];
-    this.states = [];
     this.currentLine = 0;
     this.tokenizer = tokenizer;
 
@@ -64,36 +52,28 @@ var BackgroundTokenizer = function(tokenizer, editor) {
         if (!self.running) { return; }
 
         var workerStart = new Date();
-        var currentLine = self.currentLine;
-        var endLine = -1;
+        var startLine = self.currentLine;
         var doc = self.doc;
 
-        while (self.lines[currentLine])
-            currentLine++;
-
-        var startLine = currentLine;
+        var processedLines = 0;
 
         var len = doc.getLength();
-        var processedLines = 0;
-        self.running = false;
-        while (currentLine < len) {
-            self.$tokenizeRow(currentLine);
-            endLine = currentLine;
-            do {
-                currentLine++;
-            } while (self.lines[currentLine]);
+        while (self.currentLine < len) {
+            self.lines[self.currentLine] = self.$tokenizeRows(self.currentLine, self.currentLine)[0];
+            self.currentLine++;
 
             // only check every 5 lines
-            processedLines ++;
-            if ((processedLines % 5 === 0) && (new Date() - workerStart) > 20) {                
+            processedLines += 1;
+            if ((processedLines % 5 == 0) && (new Date() - workerStart) > 20) {
+                self.fireUpdateEvent(startLine, self.currentLine-1);
                 self.running = setTimeout(self.$worker, 20);
-                break;
+                return;
             }
         }
-        self.currentLine = currentLine;
-        
-        if (startLine <= endLine)
-            self.fireUpdateEvent(startLine, endLine);
+
+        self.running = false;
+
+        self.fireUpdateEvent(startLine, len - 1);
     };
 };
 
@@ -101,147 +81,92 @@ var BackgroundTokenizer = function(tokenizer, editor) {
 
     oop.implement(this, EventEmitter);
 
-    /**
-     * Sets a new tokenizer for this object.
-     *
-     * @param {Tokenizer} tokenizer The new tokenizer to use
-     *
-     **/
     this.setTokenizer = function(tokenizer) {
         this.tokenizer = tokenizer;
         this.lines = [];
-        this.states = [];
 
         this.start(0);
     };
 
-    /**
-     * Sets a new document to associate with this object.
-     * @param {Document} doc The new document to associate with
-     **/
     this.setDocument = function(doc) {
         this.doc = doc;
         this.lines = [];
-        this.states = [];
 
         this.stop();
     };
 
-     /**
-     * Fires whenever the background tokeniziers between a range of rows are going to be updated.
-     * 
-     * @event update
-     * @param {Object} e An object containing two properties, `first` and `last`, which indicate the rows of the region being updated.
-     *
-     **/
-    /**
-     * Emits the `'update'` event. `firstRow` and `lastRow` are used to define the boundaries of the region to be updated.
-     * @param {Number} firstRow The starting row region
-     * @param {Number} lastRow The final row region
-     *
-     **/
     this.fireUpdateEvent = function(firstRow, lastRow) {
         var data = {
             first: firstRow,
             last: lastRow
         };
-        this._signal("update", {data: data});
+        this._dispatchEvent("update", {data: data});
     };
 
-    /**
-     * Starts tokenizing at the row indicated.
-     *
-     * @param {Number} startRow The row to start at
-     *
-     **/
     this.start = function(startRow) {
-        this.currentLine = Math.min(startRow || 0, this.currentLine, this.doc.getLength());
+        this.currentLine = Math.min(startRow || 0, this.currentLine,
+                                    this.doc.getLength());
 
         // remove all cached items below this line
         this.lines.splice(this.currentLine, this.lines.length);
-        this.states.splice(this.currentLine, this.states.length);
 
         this.stop();
         // pretty long delay to prevent the tokenizer from interfering with the user
         this.running = setTimeout(this.$worker, 700);
     };
-    
-    this.scheduleStart = function() {
-        if (!this.running)
-            this.running = setTimeout(this.$worker, 700);
-    }
 
-    this.$updateOnChange = function(delta) {
-        var range = delta.range;
-        var startRow = range.start.row;
-        var len = range.end.row - startRow;
-
-        if (len === 0) {
-            this.lines[startRow] = null;
-        } else if (delta.action == "removeText" || delta.action == "removeLines") {
-            this.lines.splice(startRow, len + 1, null);
-            this.states.splice(startRow, len + 1, null);
-        } else {
-            var args = Array(len + 1);
-            args.unshift(startRow, 1);
-            this.lines.splice.apply(this.lines, args);
-            this.states.splice.apply(this.states, args);
-        }
-
-        this.currentLine = Math.min(startRow, this.currentLine, this.doc.getLength());
-
-        this.stop();
-    };
-
-    /**
-     * Stops tokenizing.
-     *
-     **/
     this.stop = function() {
         if (this.running)
             clearTimeout(this.running);
         this.running = false;
     };
 
-    /**
-     * Gives list of tokens of the row. (tokens are cached)
-     * 
-     * @param {Number} row The row to get tokens at
-     *
-     * 
-     *
-     **/
-    this.getTokens = function(row) {
-        return this.lines[row] || this.$tokenizeRow(row);
+    this.getTokens = function(firstRow, lastRow) {
+        return this.$tokenizeRows(firstRow, lastRow);
     };
 
-    /**
-     * [Returns the state of tokenization at the end of a row.]{: #BackgroundTokenizer.getState}
-     *
-     * @param {Number} row The row to get state at
-     **/
     this.getState = function(row) {
-        if (this.currentLine == row)
-            this.$tokenizeRow(row);
-        return this.states[row] || "start";
+        return this.$tokenizeRows(row, row)[0].state;
     };
 
-    this.$tokenizeRow = function(row) {
-        var line = this.doc.getLine(row);
-        var state = this.states[row - 1];
+    this.$tokenizeRows = function(firstRow, lastRow) {
+        if (!this.doc)
+            return [];
+            
+        var rows = [];
 
-        var data = this.tokenizer.getLineTokens(line, state, row);
-
-        if (this.states[row] + "" !== data.state + "") {
-            this.states[row] = data.state;
-            this.lines[row + 1] = null;
-            if (this.currentLine > row + 1)
-                this.currentLine = row + 1;
-        } else if (this.currentLine == row) {
-            this.currentLine = row + 1;
+        // determine start state
+        var state = "start";
+        var doCache = false;
+        if (firstRow > 0 && this.lines[firstRow - 1]) {
+            state = this.lines[firstRow - 1].state;
+            doCache = true;
+        } else if (firstRow == 0) {
+            state = "start";
+            doCache = true;
+        } else if (this.lines.length > 0) {
+            // Guess that we haven't changed state.
+            state = this.lines[this.lines.length-1].state;
         }
 
-        return this.lines[row] = data.tokens;
+        var lines = this.doc.getLines(firstRow, lastRow);
+        for (var row=firstRow; row<=lastRow; row++) {
+            if (!this.lines[row]) {
+                var tokens = this.tokenizer.getLineTokens(lines[row-firstRow] || "", state);
+                var state = tokens.state;
+                rows.push(tokens);
+
+                if (doCache) {
+                    this.lines[row] = tokens;
+                }
+            }
+            else {
+                var tokens = this.lines[row];
+                state = tokens.state;
+                rows.push(tokens);
+            }
+        }
+        return rows;
     };
 
 }).call(BackgroundTokenizer.prototype);

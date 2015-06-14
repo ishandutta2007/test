@@ -1,30 +1,38 @@
 /* ***** BEGIN LICENSE BLOCK *****
- * Distributed under the BSD license:
+ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
- * Copyright (c) 2010, Ajax.org B.V.
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Ajax.org B.V. nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL AJAX.ORG B.V. BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
+ *
+ * The Original Code is Ajax.org Code Editor (ACE).
+ *
+ * The Initial Developer of the Original Code is
+ * Ajax.org B.V.
+ * Portions created by the Initial Developer are Copyright (C) 2010
+ * the Initial Developer. All Rights Reserved.
+ *
+ * Contributor(s):
+ *      Fabian Jakobs <fabian AT ajax DOT org>
+ *      Julian Viereck <julian DOT viereck AT gmail DOT com>
+ *
+ * Alternatively, the contents of this file may be used under the terms of
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * in which case the provisions of the GPL or the LGPL are applicable instead
+ * of those above. If you wish to allow use of your version of this file only
+ * under the terms of either the GPL or the LGPL, and not to allow others to
+ * use your version of this file under the terms of the MPL, indicate your
+ * decision by deleting the provisions above and replace them with the notice
+ * and other provisions required by the GPL or the LGPL. If you do not delete
+ * the provisions above, a recipient may use your version of this file under
+ * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
 
@@ -34,16 +42,13 @@ if (typeof process !== "undefined") {
 }
 
 define(function(require, exports, module) {
-"use strict";
 
 var EditSession = require("./edit_session").EditSession;
 var Editor = require("./editor").Editor;
 var MockRenderer = require("./test/mockrenderer").MockRenderer;
 var assert = require("./test/assertions");
 var JavaScriptMode = require("./mode/javascript").Mode;
-var PlaceHolder = require("./placeholder").PlaceHolder;
-var UndoManager = require("./undomanager").UndoManager;
-require("./multi_select")
+var PlaceHolder = require('./placeholder').PlaceHolder;
 
 module.exports = {
 
@@ -90,7 +95,7 @@ module.exports = {
             editor.insert('v');
             assert.equal(session.doc.getValue(), "var v$a = 10;\nconsole.log(v$a, v$a);");
             next();
-        }, 20);
+        }, 10);
     },
 
    "test: detaching placeholder" : function() {
@@ -128,25 +133,6 @@ module.exports = {
         editor.moveCursorTo(1, 0);
         p.onCursorChange(); // Have to do this by hand because moveCursorTo doesn't trigger the event
         assert.ok(left);
-    },
-    
-    "test: cancel": function(next) {
-        var session = new EditSession("var a = 10;\nconsole.log(a, a);", new JavaScriptMode());
-        session.setUndoManager(new UndoManager());
-        var editor = new Editor(new MockRenderer(), session);
-        var p = new PlaceHolder(session, 1, {row: 0, column: 4}, [{row: 1, column: 12}, {row: 1, column: 15}]);
-        
-        editor.moveCursorTo(0, 5);
-        editor.insert('b');
-        editor.insert('cd');
-        editor.remove('left');
-        assert.equal(session.doc.getValue(), "var abc = 10;\nconsole.log(abc, abc);");
-        // Wait a little for the changes to enter the undo stack
-        setTimeout(function() {
-            p.cancel();
-            assert.equal(session.doc.getValue(), "var a = 10;\nconsole.log(a, a);");
-            next();
-        }, 80);
     }
 };
 

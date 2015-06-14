@@ -1,40 +1,47 @@
-/* ***** BEGIN LICENSE BLOCK *****
- * Distributed under the BSD license:
+/* vim:ts=4:sts=4:sw=4:
+ * ***** BEGIN LICENSE BLOCK *****
+ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
- * Copyright (c) 2010, Ajax.org B.V.
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Ajax.org B.V. nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL AJAX.ORG B.V. BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
+ *
+ * The Original Code is Ajax.org Code Editor (ACE).
+ *
+ * The Initial Developer of the Original Code is
+ * Ajax.org B.V.
+ * Portions created by the Initial Developer are Copyright (C) 2010
+ * the Initial Developer. All Rights Reserved.
+ *
+ * Contributor(s):
+ *      Julian Viereck <julian DOT viereck AT gmail DOT com>
+ *
+ * Alternatively, the contents of this file may be used under the terms of
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * in which case the provisions of the GPL or the LGPL are applicable instead
+ * of those above. If you wish to allow use of your version of this file only
+ * under the terms of either the GPL or the LGPL, and not to allow others to
+ * use your version of this file under the terms of the MPL, indicate your
+ * decision by deleting the provisions above and replace them with the notice
+ * and other provisions required by the GPL or the LGPL. If you do not delete
+ * the provisions above, a recipient may use your version of this file under
+ * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
 
 define(function(require, exports, module) {
-"use strict";
 
 var Range = require("../range").Range;
 
-/*
- * If an array is passed in, the folds are expected to be sorted already.
+/**
+ * If the an array is passed in, the folds are expected to be sorted already.
  */
 function FoldLine(foldData, folds) {
     this.foldData = foldData;
@@ -44,7 +51,7 @@ function FoldLine(foldData, folds) {
         folds = this.folds = [ folds ];
     }
 
-    var last = folds[folds.length - 1];
+    var last = folds[folds.length - 1]
     this.range = new Range(folds[0].start.row, folds[0].start.column,
                            last.end.row, last.end.column);
     this.start = this.range.start;
@@ -56,7 +63,7 @@ function FoldLine(foldData, folds) {
 }
 
 (function() {
-    /*
+    /**
      * Note: This doesn't update wrapData!
      */
     this.shiftRow = function(shift) {
@@ -66,12 +73,12 @@ function FoldLine(foldData, folds) {
             fold.start.row += shift;
             fold.end.row += shift;
         });
-    };
+    }
 
     this.addFold = function(fold) {
         if (fold.sameRow) {
             if (fold.start.row < this.startRow || fold.endRow > this.endRow) {
-                throw new Error("Can't add a fold to this FoldLine as it has no connection");
+                throw "Can't add a fold to this FoldLine as it has no connection";
             }
             this.folds.push(fold);
             this.folds.sort(function(a, b) {
@@ -93,20 +100,20 @@ function FoldLine(foldData, folds) {
             this.start.row = fold.start.row;
             this.start.column = fold.start.column;
         } else {
-            throw new Error("Trying to add fold to FoldRow that doesn't have a matching row");
+            throw "Trying to add fold to FoldRow that doesn't have a matching row";
         }
         fold.foldLine = this;
-    };
+    }
 
     this.containsRow = function(row) {
         return row >= this.start.row && row <= this.end.row;
-    };
+    }
 
     this.walk = function(callback, endRow, endColumn) {
         var lastEnd = 0,
             folds = this.folds,
             fold,
-            cmp, stop, isNewRow = true;
+            comp, stop, isNewRow = true;
 
         if (endRow == null) {
             endRow = this.end.row;
@@ -116,9 +123,9 @@ function FoldLine(foldData, folds) {
         for (var i = 0; i < folds.length; i++) {
             fold = folds[i];
 
-            cmp = fold.range.compareStart(endRow, endColumn);
+            comp = fold.range.compareStart(endRow, endColumn);
             // This fold is after the endRow/Column.
-            if (cmp == -1) {
+            if (comp == -1) {
                 callback(null, endRow, endColumn, lastEnd, isNewRow);
                 return;
             }
@@ -127,8 +134,8 @@ function FoldLine(foldData, folds) {
             stop = !stop && callback(fold.placeholder, fold.start.row, fold.start.column, lastEnd);
 
             // If the user requested to stop the walk or endRow/endColumn is
-            // inside of this fold (cmp == 0), then end here.
-            if (stop || cmp === 0) {
+            // inside of this fold (comp == 0), then end here.
+            if (stop || comp == 0) {
                 return;
             }
 
@@ -138,7 +145,7 @@ function FoldLine(foldData, folds) {
             lastEnd = fold.end.column;
         }
         callback(null, endRow, endColumn, lastEnd, isNewRow);
-    };
+    }
 
     this.getNextFoldTo = function(row, column) {
         var fold, cmp;
@@ -150,15 +157,15 @@ function FoldLine(foldData, folds) {
                     fold: fold,
                     kind: "after"
                 };
-            } else if (cmp === 0) {
+            } else if (cmp == 0) {
                 return {
                     fold: fold,
                     kind: "inside"
-                };
+                }
             }
         }
         return null;
-    };
+    }
 
     this.addRemoveChars = function(row, column, len) {
         var ret = this.getNextFoldTo(row, column),
@@ -169,13 +176,11 @@ function FoldLine(foldData, folds) {
                 && fold.start.column != column
                 && fold.start.row != row)
             {
-                //throwing here breaks whole editor
-                //TODO: properly handle this
-                window.console && window.console.log(row, column, fold);
+                throw "Moving characters inside of a fold should never be reached";
             } else if (fold.start.row == row) {
                 folds = this.folds;
                 var i = folds.indexOf(fold);
-                if (i === 0) {
+                if (i == 0) {
                     this.start.column += len;
                 }
                 for (i; i < folds.length; i++) {
@@ -189,18 +194,16 @@ function FoldLine(foldData, folds) {
                 this.end.column += len;
             }
         }
-    };
+    }
 
     this.split = function(row, column) {
-        var pos = this.getNextFoldTo(row, column);
-        
-        if (!pos || pos.kind == "inside")
-            return null;
-            
-        var fold = pos.fold;
-        var folds = this.folds;
+        var fold = this.getNextFoldTo(row, column).fold,
+            folds = this.folds;
         var foldData = this.foldData;
-        
+
+        if (!fold) {
+            return null;
+        }
         var i = folds.indexOf(fold);
         var foldBefore = folds[i - 1];
         this.end.row = foldBefore.end.row;
@@ -213,7 +216,7 @@ function FoldLine(foldData, folds) {
         var newFoldLine = new FoldLine(foldData, folds);
         foldData.splice(foldData.indexOf(this) + 1, 0, newFoldLine);
         return newFoldLine;
-    };
+    }
 
     this.merge = function(foldLineNext) {
         var folds = foldLineNext.folds;
@@ -224,7 +227,7 @@ function FoldLine(foldData, folds) {
         // it's merged now with foldLineNext.
         var foldData = this.foldData;
         foldData.splice(foldData.indexOf(foldLineNext), 1);
-    };
+    }
 
     this.toString = function() {
         var ret = [this.range.toString() + ": [" ];
@@ -232,12 +235,13 @@ function FoldLine(foldData, folds) {
         this.folds.forEach(function(fold) {
             ret.push("  " + fold.toString());
         });
-        ret.push("]");
+        ret.push("]")
         return ret.join("\n");
-    };
+    }
 
     this.idxToPosition = function(idx) {
         var lastFoldEndColumn = 0;
+        var fold;
 
         for (var i = 0; i < this.folds.length; i++) {
             var fold = this.folds[i];
@@ -262,7 +266,7 @@ function FoldLine(foldData, folds) {
             row: this.end.row,
             column: this.end.column + idx
         };
-    };
+    }
 }).call(FoldLine.prototype);
 
 exports.FoldLine = FoldLine;

@@ -1,16 +1,13 @@
-/*
- *  Based on code from:
- *
- * XRegExp 1.5.0
- * (c) 2007-2010 Steven Levithan
- * MIT License
- * <http://xregexp.com>
- * Provides an augmented, extensible, cross-browser implementation of regular expressions,
- * including support for additional syntax, flags, and methods
- */
- 
 define(function(require, exports, module) {
-"use strict";
+
+// Based on code from:
+//
+// XRegExp 1.5.0
+// (c) 2007-2010 Steven Levithan
+// MIT License
+// <http://xregexp.com>
+// Provides an augmented, extensible, cross-browser implementation of regular expressions,
+// including support for additional syntax, flags, and methods
 
     //---------------------------------
     //  Private variables
@@ -30,9 +27,6 @@ define(function(require, exports, module) {
             return !x.lastIndex;
         }();
 
-    if (compliantLastIndexIncrement && compliantExecNpcg)
-        return;
-
     //---------------------------------
     //  Overriden native methods
     //---------------------------------
@@ -45,7 +39,7 @@ define(function(require, exports, module) {
     RegExp.prototype.exec = function (str) {
         var match = real.exec.apply(this, arguments),
             name, r2;
-        if ( typeof(str) == 'string' && match) {
+        if (match) {
             // Fix browsers whose `exec` methods don't consistently return `undefined` for
             // nonparticipating capturing groups
             if (!compliantExecNpcg && match.length > 1 && indexOf(match, "") > -1) {
@@ -98,7 +92,7 @@ define(function(require, exports, module) {
                (regex.multiline  ? "m" : "") +
                (regex.extended   ? "x" : "") + // Proposed for ES4; included in AS3
                (regex.sticky     ? "y" : "");
-    }
+    };
 
     function indexOf (array, item, from) {
         if (Array.prototype.indexOf) // Use the native array method if available
@@ -108,6 +102,6 @@ define(function(require, exports, module) {
                 return i;
         }
         return -1;
-    }
+    };
 
 });

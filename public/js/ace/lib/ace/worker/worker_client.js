@@ -1,131 +1,145 @@
 /* ***** BEGIN LICENSE BLOCK *****
- * Distributed under the BSD license:
+ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
- * Copyright (c) 2010, Ajax.org B.V.
- * All rights reserved.
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Ajax.org B.V. nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL AJAX.ORG B.V. BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * The Original Code is Ajax.org Code Editor (ACE).
+ *
+ * The Initial Developer of the Original Code is
+ * Ajax.org B.V.
+ * Portions created by the Initial Developer are Copyright (C) 2010
+ * the Initial Developer. All Rights Reserved.
+ *
+ * Contributor(s):
+ *      Fabian Jakobs <fabian AT ajax DOT org>
+ *
+ * Alternatively, the contents of this file may be used under the terms of
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * in which case the provisions of the GPL or the LGPL are applicable instead
+ * of those above. If you wish to allow use of your version of this file only
+ * under the terms of either the GPL or the LGPL, and not to allow others to
+ * use your version of this file under the terms of the MPL, indicate your
+ * decision by deleting the provisions above and replace them with the notice
+ * and other provisions required by the GPL or the LGPL. If you do not delete
+ * the provisions above, a recipient may use your version of this file under
+ * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
 
 define(function(require, exports, module) {
-"use strict";
 
 var oop = require("../lib/oop");
-var net = require("../lib/net");
 var EventEmitter = require("../lib/event_emitter").EventEmitter;
-var config = require("../config");
 
-var WorkerClient = function(topLevelNamespaces, mod, classname, workerUrl) {
-    this.$sendDeltaQueue = this.$sendDeltaQueue.bind(this);
+var WorkerClient = function(topLevelNamespaces, packagedJs, module, classname) {
+
     this.changeListener = this.changeListener.bind(this);
-    this.onMessage = this.onMessage.bind(this);
 
-    // nameToUrl is renamed to toUrl in requirejs 2
-    if (require.nameToUrl && !require.toUrl)
-        require.toUrl = require.nameToUrl;
-    
-    if (config.get("packaged") || !require.toUrl) {
-        workerUrl = workerUrl || config.moduleUrl(mod, "worker");
-    } else {
-        var normalizePath = this.$normalizePath;
-        workerUrl = workerUrl || normalizePath(require.toUrl("ace/worker/worker.js", null, "_"));
+    if (window.require.packaged) {
+        var base = this.$guessBasePath();
+        var worker = this.$worker = new Worker(base + packagedJs);
+    }
+    else {
+        var workerUrl = this.$normalizePath(require.nameToUrl("ace/worker/worker", null, "_"));
+        var worker = this.$worker = new Worker(workerUrl);
 
         var tlns = {};
-        topLevelNamespaces.forEach(function(ns) {
-            tlns[ns] = normalizePath(require.toUrl(ns, null, "_").replace(/(\.js)?(\?.*)?$/, ""));
-        });
-    }
+        for (var i=0; i<topLevelNamespaces.length; i++) {
+            var ns = topLevelNamespaces[i];
+            var path = this.$normalizePath(require.nameToUrl(ns, null, "_").replace(/.js$/, ""));
 
-    try {
-        this.$worker = new Worker(workerUrl);
-    } catch(e) {
-        if (e instanceof window.DOMException) {
-            // Likely same origin problem. Use importScripts from a shim Worker
-            var blob = this.$workerBlob(workerUrl);
-            var URL = window.URL || window.webkitURL;
-            var blobURL = URL.createObjectURL(blob);
-
-            this.$worker = new Worker(blobURL);
-            URL.revokeObjectURL(blobURL);
-        } else {
-            throw e;
+            tlns[ns] = path;
         }
     }
+
     this.$worker.postMessage({
         init : true,
-        tlns : tlns,
-        module : mod,
-        classname : classname
+        tlns: tlns,
+        module: module,
+        classname: classname
     });
 
     this.callbackId = 1;
     this.callbacks = {};
 
-    this.$worker.onmessage = this.onMessage;
+    var _self = this;
+    this.$worker.onerror = function(e) {
+        window.console && console.log && console.log(e);
+        throw e;
+    };
+    this.$worker.onmessage = function(e) {
+        var msg = e.data;
+        switch(msg.type) {
+            case "log":
+                window.console && console.log && console.log(msg.data);
+                break;
+
+            case "event":
+                _self._dispatchEvent(msg.name, {data: msg.data});
+                break;
+
+            case "call":
+                var callback = _self.callbacks[msg.id];
+                if (callback) {
+                    callback(msg.data);
+                    delete _self.callbacks[msg.id];
+                }
+                break;
+        }
+    };
 };
 
 (function(){
 
     oop.implement(this, EventEmitter);
 
-    this.onMessage = function(e) {
-        var msg = e.data;
-        switch(msg.type) {
-            case "event":
-                this._signal(msg.name, {data: msg.data});
-                break;
-            case "call":
-                var callback = this.callbacks[msg.id];
-                if (callback) {
-                    callback(msg.data);
-                    delete this.callbacks[msg.id];
-                }
-                break;
-            case "error":
-                this.reportError(msg.data);
-                break;
-            case "log":
-                window.console && console.log && console.log.apply(console, msg.data);
-                break;
+    this.$normalizePath = function(path) {
+        if (!path.match(/^\w+:/)) {
+            path = location.protocol + "//" + location.host
+                // paths starting with a slash are relative to the root (host)
+                + (path.charAt(0) == "/" ? "" : location.pathname.replace(/\/[^\/]*$/, ""))
+                + "/" + path.replace(/^[\/]+/, "");
         }
-    };
-    
-    this.reportError = function(err) {
-        window.console && console.error && console.error(err);
+        return path;
     };
 
-    this.$normalizePath = function(path) {
-        return net.qualifyURL(path);
+    this.$guessBasePath = function() {
+        if (require.aceBaseUrl)
+            return require.aceBaseUrl;
+
+        var scripts = document.getElementsByTagName("script");
+        for (var i=0; i<scripts.length; i++) {
+            var script = scripts[i];
+
+            var base = script.getAttribute("data-ace-base");
+            if (base)
+                return base.replace(/\/*$/, "/");
+
+            var src = script.src || script.getAttribute("src");
+            if (!src) {
+                continue;
+            }
+            var m = src.match(/^(?:(.*\/)ace\.js|(.*\/)ace-uncompressed\.js)(?:\?|$)/);
+            if (m)
+                return m[1] || m[2];
+        }
+        return "";
     };
 
     this.terminate = function() {
-        this._signal("terminate", {});
-        this.deltaQueue = null;
+        this._dispatchEvent("terminate", {});
         this.$worker.terminate();
         this.$worker = null;
-        if (this.$doc)
-            this.$doc.off("change", this.changeListener);
+        this.$doc.removeEventListener("change", this.changeListener);
         this.$doc = null;
     };
 
@@ -148,9 +162,7 @@ var WorkerClient = function(topLevelNamespaces, mod, classname, workerUrl) {
             // TODO: cleanup event
             this.$worker.postMessage({event: event, data: {data: data.data}});
         }
-        catch(ex) {
-            console.error(ex.stack);
-        }
+        catch(ex) {}
     };
 
     this.attachToDocument = function(doc) {
@@ -163,93 +175,15 @@ var WorkerClient = function(topLevelNamespaces, mod, classname, workerUrl) {
     };
 
     this.changeListener = function(e) {
-        if (!this.deltaQueue) {
-            this.deltaQueue = [e.data];
-            setTimeout(this.$sendDeltaQueue, 0);
-        } else
-            this.deltaQueue.push(e.data);
-    };
-
-    this.$sendDeltaQueue = function() {
-        var q = this.deltaQueue;
-        if (!q) return;
-        this.deltaQueue = null;
-        if (q.length > 20 && q.length > this.$doc.getLength() >> 1) {
-            this.call("setValue", [this.$doc.getValue()]);
-        } else
-            this.emit("change", {data: q});
-    };
-
-    this.$workerBlob = function(workerUrl) {
-        // workerUrl can be protocol relative
-        // importScripts only takes fully qualified urls
-        var script = "importScripts('" + net.qualifyURL(workerUrl) + "');";
-        try {
-            return new Blob([script], {"type": "application/javascript"});
-        } catch (e) { // Backwards-compatibility
-            var BlobBuilder = window.BlobBuilder || window.WebKitBlobBuilder || window.MozBlobBuilder;
-            var blobBuilder = new BlobBuilder();
-            blobBuilder.append(script);
-            return blobBuilder.getBlob("application/javascript");
-        }
+        e.range = {
+            start: e.data.range.start,
+            end: e.data.range.end
+        };
+        this.emit("change", e);
     };
 
 }).call(WorkerClient.prototype);
 
-
-var UIWorkerClient = function(topLevelNamespaces, mod, classname) {
-    this.$sendDeltaQueue = this.$sendDeltaQueue.bind(this);
-    this.changeListener = this.changeListener.bind(this);
-    this.callbackId = 1;
-    this.callbacks = {};
-    this.messageBuffer = [];
-
-    var main = null;
-    var emitSync = false;
-    var sender = Object.create(EventEmitter);
-    var _self = this;
-
-    this.$worker = {};
-    this.$worker.terminate = function() {};
-    this.$worker.postMessage = function(e) {
-        _self.messageBuffer.push(e);
-        if (main) {
-            if (emitSync)
-                setTimeout(processNext);
-            else
-                processNext();
-        }
-    };
-    this.setEmitSync = function(val) { emitSync = val };
-
-    var processNext = function() {
-        var msg = _self.messageBuffer.shift();
-        if (msg.command)
-            main[msg.command].apply(main, msg.args);
-        else if (msg.event)
-            sender._signal(msg.event, msg.data);
-    };
-
-    sender.postMessage = function(msg) {
-        _self.onMessage({data: msg});
-    };
-    sender.callback = function(data, callbackId) {
-        this.postMessage({type: "call", id: callbackId, data: data});
-    };
-    sender.emit = function(name, data) {
-        this.postMessage({type: "event", name: name, data: data});
-    };
-
-    config.loadModule(["worker", mod], function(Main) {
-        main = new Main[classname](sender);
-        while (_self.messageBuffer.length)
-            processNext();
-    });
-};
-
-UIWorkerClient.prototype = WorkerClient.prototype;
-
-exports.UIWorkerClient = UIWorkerClient;
 exports.WorkerClient = WorkerClient;
 
 });

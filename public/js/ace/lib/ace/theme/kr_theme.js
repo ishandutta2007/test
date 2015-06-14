@@ -1,39 +1,257 @@
 /* ***** BEGIN LICENSE BLOCK *****
- * Distributed under the BSD license:
+ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
- * Copyright (c) 2010, Ajax.org B.V.
- * All rights reserved.
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Ajax.org B.V. nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL AJAX.ORG B.V. BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
+ *
+ * The Original Code is Ajax.org Code Editor (ACE).
+ *
+ * The Initial Developer of the Original Code is
+ * Ajax.org B.V.
+ * Portions created by the Initial Developer are Copyright (C) 2010
+ * the Initial Developer. All Rights Reserved.
+ *
+ * Contributor(s):
+ *      Fabian Jakobs <fabian AT ajax DOT org>
+ *
+ * Alternatively, the contents of this file may be used under the terms of
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * in which case the provisions of the GPL or the LGPL are applicable instead
+ * of those above. If you wish to allow use of your version of this file only
+ * under the terms of either the GPL or the LGPL, and not to allow others to
+ * use your version of this file under the terms of the MPL, indicate your
+ * decision by deleting the provisions above and replace them with the notice
+ * and other provisions required by the GPL or the LGPL. If you do not delete
+ * the provisions above, a recipient may use your version of this file under
+ * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
 
 define(function(require, exports, module) {
 
-exports.isDark = true;
-exports.cssClass = "ace-kr-theme";
-exports.cssText = require("../requirejs/text!./kr_theme.css");
+exports.cssText = ".ace-kr-theme .ace_editor {\
+  border: 2px solid rgb(159, 159, 159);\
+}\
+\
+.ace-kr-theme .ace_editor.ace_focus {\
+  border: 2px solid #327fbd;\
+}\
+\
+.ace-kr-theme .ace_gutter {\
+  width: 50px;\
+  background: #e8e8e8;\
+  color: #333;\
+  overflow : hidden;\
+}\
+\
+.ace-kr-theme .ace_gutter-layer {\
+  width: 100%;\
+  text-align: right;\
+}\
+\
+.ace-kr-theme .ace_gutter-layer .ace_gutter-cell {\
+  padding-right: 6px;\
+}\
+\
+.ace-kr-theme .ace_print_margin {\
+  width: 1px;\
+  background: #e8e8e8;\
+}\
+\
+.ace-kr-theme .ace_scroller {\
+  background-color: #0B0A09;\
+}\
+\
+.ace-kr-theme .ace_text-layer {\
+  cursor: text;\
+  color: #FCFFE0;\
+}\
+\
+.ace-kr-theme .ace_cursor {\
+  border-left: 2px solid #FF9900;\
+}\
+\
+.ace-kr-theme .ace_cursor.ace_overwrite {\
+  border-left: 0px;\
+  border-bottom: 1px solid #FF9900;\
+}\
+ \
+.ace-kr-theme .ace_marker-layer .ace_selection {\
+  background: rgba(170, 0, 255, 0.45);\
+}\
+\
+.ace-kr-theme .ace_marker-layer .ace_step {\
+  background: rgb(198, 219, 174);\
+}\
+\
+.ace-kr-theme .ace_marker-layer .ace_bracket {\
+  margin: -1px 0 0 -1px;\
+  border: 1px solid rgba(255, 177, 111, 0.32);\
+}\
+\
+.ace-kr-theme .ace_marker-layer .ace_active_line {\
+  background: #38403D;\
+}\
+\
+       \
+.ace-kr-theme .ace_invisible {\
+  color: rgba(255, 177, 111, 0.32);\
+}\
+\
+.ace-kr-theme .ace_keyword {\
+  color:#949C8B;\
+}\
+\
+.ace-kr-theme .ace_keyword.ace_operator {\
+  \
+}\
+\
+.ace-kr-theme .ace_constant {\
+  color:rgba(210, 117, 24, 0.76);\
+}\
+\
+.ace-kr-theme .ace_constant.ace_language {\
+  \
+}\
+\
+.ace-kr-theme .ace_constant.ace_library {\
+  \
+}\
+\
+.ace-kr-theme .ace_constant.ace_numeric {\
+  \
+}\
+\
+.ace-kr-theme .ace_invalid {\
+  color:#F8F8F8;\
+background-color:#A41300;\
+}\
+\
+.ace-kr-theme .ace_invalid.ace_illegal {\
+  \
+}\
+\
+.ace-kr-theme .ace_invalid.ace_deprecated {\
+  \
+}\
+\
+.ace-kr-theme .ace_support {\
+  color:#9FC28A;\
+}\
+\
+.ace-kr-theme .ace_support.ace_function {\
+  color:#85873A;\
+}\
+\
+.ace-kr-theme .ace_function.ace_buildin {\
+  \
+}\
+\
+.ace-kr-theme .ace_string {\
+  \
+}\
+\
+.ace-kr-theme .ace_string.ace_regexp {\
+  color:rgba(125, 255, 192, 0.65);\
+}\
+\
+.ace-kr-theme .ace_comment {\
+  font-style:italic;\
+color:#706D5B;\
+}\
+\
+.ace-kr-theme .ace_comment.ace_doc {\
+  \
+}\
+\
+.ace-kr-theme .ace_comment.ace_doc.ace_tag {\
+  \
+}\
+\
+.ace-kr-theme .ace_variable {\
+  color:#D1A796;\
+}\
+\
+.ace-kr-theme .ace_variable.ace_language {\
+  color:#FF80E1;\
+}\
+\
+.ace-kr-theme .ace_xml_pe {\
+  \
+}\
+\
+.ace-kr-theme .ace_meta {\
+  \
+}\
+\
+.ace-kr-theme .ace_meta.ace_tag {\
+  color:#BABD9C;\
+}\
+\
+.ace-kr-theme .ace_meta.ace_tag.ace_input {\
+  \
+}\
+\
+.ace-kr-theme .ace_entity.ace_other.ace_attribute-name {\
+  \
+}\
+\
+.ace-kr-theme .ace_entity.ace_name {\
+  \
+}\
+\
+.ace-kr-theme .ace_entity.ace_name.ace_function {\
+  \
+}\
+\
+.ace-kr-theme .ace_markup.ace_underline {\
+    text-decoration:underline;\
+}\
+\
+.ace-kr-theme .ace_markup.ace_heading {\
+  \
+}\
+\
+.ace-kr-theme .ace_markup.ace_heading.ace_1 {\
+  \
+}\
+\
+.ace-kr-theme .ace_markup.ace_heading.ace_2 {\
+  \
+}\
+\
+.ace-kr-theme .ace_markup.ace_heading.ace_3 {\
+  \
+}\
+\
+.ace-kr-theme .ace_markup.ace_heading.ace_4 {\
+  \
+}\
+\
+.ace-kr-theme .ace_markup.ace_heading.ace_5 {\
+  \
+}\
+\
+.ace-kr-theme .ace_markup.ace_heading.ace_6 {\
+  \
+}\
+\
+.ace-kr-theme .ace_markup.ace_list {\
+  background-color:#0F0040;\
+}\
+\
+.ace-kr-theme .ace_collab.ace_user1 {\
+     \
+}";
 
-var dom = require("../lib/dom");
-dom.importCssString(exports.cssText, exports.cssClass);
+exports.cssClass = "ace-kr-theme";
+
 });

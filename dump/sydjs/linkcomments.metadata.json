@@ -1,0 +1,1 @@
+{"indexes":[{"v":1,"key":{"_id":1},"name":"_id_","ns":"sydjs.linkcomments"},{"v":1,"key":{"link":1},"name":"link_1","ns":"sydjs.linkcomments","background":true,"safe":null},{"v":1,"key":{"author":1},"name":"author_1","ns":"sydjs.linkcomments","background":true,"safe":null},{"v":1,"key":{"date":1},"name":"date_1","ns":"sydjs.linkcomments","background":true,"safe":null}]}

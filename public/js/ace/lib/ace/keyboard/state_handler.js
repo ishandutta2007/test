@@ -1,35 +1,41 @@
 /* ***** BEGIN LICENSE BLOCK *****
- * Distributed under the BSD license:
+ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
- * Copyright (c) 2010, Ajax.org B.V.
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Ajax.org B.V. nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL AJAX.ORG B.V. BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
+ *
+ * The Original Code is Mozilla Skywriter.
+ *
+ * The Initial Developer of the Original Code is
+ * Mozilla.
+ * Portions created by the Initial Developer are Copyright (C) 2009
+ * the Initial Developer. All Rights Reserved.
+ *
+ * Contributor(s):
+ *   Julian Viereck (julian.viereck@gmail.com)
+ *
+ * Alternatively, the contents of this file may be used under the terms of
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * in which case the provisions of the GPL or the LGPL are applicable instead
+ * of those above. If you wish to allow use of your version of this file only
+ * under the terms of either the GPL or the LGPL, and not to allow others to
+ * use your version of this file under the terms of the MPL, indicate your
+ * decision by deleting the provisions above and replace them with the notice
+ * and other provisions required by the GPL or the LGPL. If you do not delete
+ * the provisions above, a recipient may use your version of this file under
+ * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
 
 define(function(require, exports, module) {
-"use strict";
 
 // If you're developing a new keymapping and want to get an idea what's going
 // on, then enable debugging.
@@ -40,7 +46,7 @@ function StateHandler(keymapping) {
 }
 
 StateHandler.prototype = {
-    /*
+    /**
      * Build the RegExp from the keymapping as RegExp can't stored directly
      * in the metadata JSON and as the RegExp used to match the keys/buffer
      * need to be adapted.
@@ -67,7 +73,7 @@ StateHandler.prototype = {
         });
     },
 
-    $composeBuffer: function(data, hashId, key, e) {
+    $composeBuffer: function(data, hashId, key) {
         // Initialize the data object.
         if (data.state == null || data.buffer == null) {
             data.state = "start";
@@ -96,23 +102,17 @@ StateHandler.prototype = {
             data.buffer = bufferToUse;
         }
 
-        var bufferObj = {
-            bufferToUse: bufferToUse,
-            symbolicName: symbolicName
+        return {
+            bufferToUse:    bufferToUse,
+            symbolicName:   symbolicName
         };
-
-        if (e) {
-            bufferObj.keyIdentifier = e.keyIdentifier;
-        }
-
-        return bufferObj;
     },
 
-    $find: function(data, buffer, symbolicName, hashId, key, keyIdentifier) {
+    $find: function(data, buffer, symbolicName, hashId, key) {
         // Holds the command to execute and the args if a command matched.
         var result = {};
 
-        // Loop over all the bindings of the keymap until a match is found.
+        // Loop over all the bindings of the keymapp until a match is found.
         this.keymapping[data.state].some(function(binding) {
             var match;
 
@@ -127,7 +127,7 @@ StateHandler.prototype = {
             }
 
             // Check if the match function matches.
-            if (binding.match && !binding.match(buffer, hashId, key, symbolicName, keyIdentifier)) {
+            if (binding.match && !binding.match(buffer, hashId, key, symbolicName)) {
                 return false;
             }
 
@@ -191,26 +191,23 @@ StateHandler.prototype = {
         }
     },
 
-    /*
+    /**
      * This function is called by keyBinding.
      */
-    handleKeyboard: function(data, hashId, key, keyCode, e) {
-        if (hashId == -1)
-            hashId = 0
+    handleKeyboard: function(data, hashId, key) {
         // If we pressed any command key but no other key, then ignore the input.
         // Otherwise "shift-" is added to the buffer, and later on "shift-g"
-        // which results in "shift-shift-g" which doesn't make sense.
+        // which results in "shift-shift-g" which doesn't make senese.
         if (hashId != 0 && (key == "" || key == String.fromCharCode(0))) {
             return null;
         }
 
         // Compute the current value of the keyboard input buffer.
-        var r = this.$composeBuffer(data, hashId, key, e);
+        var r = this.$composeBuffer(data, hashId, key);
         var buffer = r.bufferToUse;
         var symbolicName = r.symbolicName;
-        var keyId = r.keyIdentifier;
 
-        r = this.$find(data, buffer, symbolicName, hashId, key, keyId);
+        r = this.$find(data, buffer, symbolicName, hashId, key);
         if (DEBUG) {
             console.log("KeyboardStateMapper#match", buffer, symbolicName, r);
         }
@@ -219,11 +216,12 @@ StateHandler.prototype = {
     }
 }
 
-/*
+/**
  * This is a useful matching function and therefore is defined here so that
  * users of KeyboardStateMapper can use it.
  *
- * @return {Boolean} If no command key (Command|Option|Shift|Ctrl) is pressed, it
+ * @return boolean
+ *          If no command key (Command|Option|Shift|Ctrl) is pressed, it
  *          returns true. If the only the Shift key is pressed + a character
  *          true is returned as well. Otherwise, false is returned.
  *          Summing up, the function returns true whenever the user typed

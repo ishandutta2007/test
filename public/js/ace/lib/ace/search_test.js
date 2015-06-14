@@ -1,30 +1,38 @@
 /* ***** BEGIN LICENSE BLOCK *****
- * Distributed under the BSD license:
+ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
- * Copyright (c) 2010, Ajax.org B.V.
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Ajax.org B.V. nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL AJAX.ORG B.V. BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
+ *
+ * The Original Code is Ajax.org Code Editor (ACE).
+ *
+ * The Initial Developer of the Original Code is
+ * Ajax.org B.V.
+ * Portions created by the Initial Developer are Copyright (C) 2010
+ * the Initial Developer. All Rights Reserved.
+ *
+ * Contributor(s):
+ *      Fabian Jakobs <fabian AT ajax DOT org>
+ *      Mihai Sucan <mihai DOT sucan AT gmail DOT com>
+ *
+ * Alternatively, the contents of this file may be used under the terms of
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * in which case the provisions of the GPL or the LGPL are applicable instead
+ * of those above. If you wish to allow use of your version of this file only
+ * under the terms of either the GPL or the LGPL, and not to allow others to
+ * use your version of this file under the terms of the MPL, indicate your
+ * decision by deleting the provisions above and replace them with the notice
+ * and other provisions required by the GPL or the LGPL. If you do not delete
+ * the provisions above, a recipient may use your version of this file under
+ * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
 
@@ -33,11 +41,8 @@ if (typeof process !== "undefined") {
 }
 
 define(function(require, exports, module) {
-"use strict";
 
 var EditSession = require("./edit_session").EditSession;
-var MockRenderer = require("./test/mockrenderer").MockRenderer;
-var Editor = require("./editor").Editor;
 var Search = require("./search").Search;
 var assert = require("./test/assertions");
 
@@ -45,7 +50,8 @@ module.exports = {
     "test: configure the search object" : function() {
         var search = new Search();
         search.set({
-            needle: "juhu"
+            needle: "juhu",
+            scope: Search.ALL
         });
     },
 
@@ -83,7 +89,7 @@ module.exports = {
         assert.position(range.end, 1, 12);
     },
 
-    "test: wrap search is on by default" : function() {
+    "test: wrap search is off by default" : function() {
         var session = new EditSession(["abc", "juhu kinners 123", "456"]);
         session.getSelection().moveCursorTo(2, 1);
 
@@ -91,26 +97,12 @@ module.exports = {
             needle: "kinners"
         });
 
-        assert.notEqual(search.find(session), null);
+        assert.equal(search.find(session), null);
     },
 
     "test: wrap search should wrap at file end" : function() {
         var session = new EditSession(["abc", "juhu kinners 123", "456"]);
         session.getSelection().moveCursorTo(2, 1);
-
-        var search = new Search().set({
-            needle: "kinners",
-            wrap: true
-        });
-
-        var range = search.find(session);
-        assert.position(range.start, 1, 5);
-        assert.position(range.end, 1, 12);
-    },
-
-    "test: wrap search should find needle even if it starts inside it" : function() {
-        var session = new EditSession(["abc", "juhu kinners 123", "456"]);
-        session.getSelection().moveCursorTo(6, 1);
 
         var search = new Search().set({
             needle: "kinners",
@@ -190,18 +182,12 @@ module.exports = {
         var search = new Search().set({
             needle: "juhu",
             wrap: true,
-            range: session.getSelection().getRange()
+            scope: Search.SELECTION
         });
 
         var range = search.find(session);
         assert.position(range.start, 1, 0);
         assert.position(range.end, 1, 4);
-
-        search = new Search().set({
-            needle: "juhu",
-            wrap: true,
-            range: session.getSelection().getRange()
-        });
 
         session.getSelection().setSelectionAnchor(0, 2);
         session.getSelection().selectTo(3, 2);
@@ -214,32 +200,24 @@ module.exports = {
     "test: find backwards in selection": function() {
         var session = new EditSession(["juhu", "juhu", "juhu", "juhu"]);
 
-        session.getSelection().setSelectionAnchor(0, 2);
-        session.getSelection().selectTo(3, 2);
-
         var search = new Search().set({
             needle: "juhu",
             wrap: true,
             backwards: true,
-            range: session.getSelection().getRange()
+            scope: Search.SELECTION
         });
+
+        session.getSelection().setSelectionAnchor(0, 2);
+        session.getSelection().selectTo(3, 2);
 
         var range = search.find(session);
         assert.position(range.start, 2, 0);
         assert.position(range.end, 2, 4);
 
-        search = new Search().set({
-            needle: "juhu",
-            wrap: true,
-            range: session.getSelection().getRange()
-        });
-
         session.getSelection().setSelectionAnchor(0, 2);
         session.getSelection().selectTo(1, 2);
 
-        var range = search.find(session);
-        assert.position(range.start, 1, 0);
-        assert.position(range.end, 1, 4);
+        assert.equal(search.find(session), null);
     },
 
     "test: edge case - match directly before the cursor" : function() {
@@ -316,14 +294,14 @@ module.exports = {
     "test: find all matches in selection" : function() {
         var session = new EditSession(["juhu", "juhu", "juhu", "juhu"]);
 
-        session.getSelection().setSelectionAnchor(0, 2);
-        session.getSelection().selectTo(3, 2);
-
         var search = new Search().set({
             needle: "uh",
             wrap: true,
-            range: session.getSelection().getRange()
+            scope: Search.SELECTION
         });
+
+        session.getSelection().setSelectionAnchor(0, 2);
+        session.getSelection().selectTo(3, 2);
 
         var ranges = search.findAll(session);
 
@@ -332,24 +310,6 @@ module.exports = {
         assert.position(ranges[0].end, 1, 3);
         assert.position(ranges[1].start, 2, 1);
         assert.position(ranges[1].end, 2, 3);
-    },
-    
-    
-    "test: find all multiline matches" : function() {
-        var session = new EditSession(["juhu", "juhu", "juhu", "juhu"]);
-
-        var search = new Search().set({
-            needle: "hu\nju",
-            wrap: true
-        });
-
-        var ranges = search.findAll(session);
-
-        assert.equal(ranges.length, 3);
-        assert.position(ranges[0].start, 0, 2);
-        assert.position(ranges[0].end, 1, 2);
-        assert.position(ranges[1].start, 1, 2);
-        assert.position(ranges[1].end, 2, 2);
     },
 
     "test: replace() should return the replacement if the input matches the needle" : function() {
@@ -360,11 +320,6 @@ module.exports = {
         assert.equal(search.replace("juhu", "kinners"), "kinners");
         assert.equal(search.replace("", "kinners"), null);
         assert.equal(search.replace(" juhu", "kinners"), null);
-
-        // case sensitivity
-        assert.equal(search.replace("Juhu", "kinners"), "kinners");
-        search.set({caseSensitive: true});
-        assert.equal(search.replace("Juhu", "kinners"), null);
 
         // regexp replacement
     },
@@ -399,7 +354,8 @@ module.exports = {
         var search = new Search().set({
             needle: "[ ]+$",
             regExp: true,
-            wrap: true
+            wrap: true,
+            scope: Search.ALL
         });
 
         session.getSelection().moveCursorTo(1, 2);
@@ -416,7 +372,7 @@ module.exports = {
         var search = new Search().set({
             needle: "foo",
             wrap: true,
-            wholeWord: true
+            wholeWord: true,
         });
 
         session.getSelection().moveCursorTo(0, 4);
@@ -439,7 +395,7 @@ module.exports = {
             needle: "foo",
             wrap: true,
             wholeWord: true,
-            backwards: true
+            backwards: true,
         });
 
         session.getSelection().moveCursorTo(0, 13);
@@ -447,44 +403,13 @@ module.exports = {
         var ranges = search.findAll(session);
 
         assert.equal(ranges.length, 3);
-        assert.position(ranges[2].start, 0, 23);
-        assert.position(ranges[2].end, 0, 26);
+        assert.position(ranges[0].start, 0, 23);
+        assert.position(ranges[0].end, 0, 26);
         assert.position(ranges[1].start, 0, 8);
         assert.position(ranges[1].end, 0, 11);
-        assert.position(ranges[0].start, 0, 0);
-        assert.position(ranges[0].end, 0, 3);
+        assert.position(ranges[2].start, 0, 0);
+        assert.position(ranges[2].end, 0, 3);
     },
-
-    "test: find next empty range" : function() {
-        var session = new EditSession("foo foobar foo");
-        var editor = new Editor(new MockRenderer(), session);
-        
-        var options = {
-            needle: "o*",
-            wrap: true,
-            regExp: true,
-            backwards: false
-        };
-        var positions = [4, 5.2, 7, 8, 9, 10, 11, 12.2, 14, 0, 1.2, 3];
-        
-        session.selection.moveCursorTo(0, 3);
-        for (var i = 0; i < 12; i++) {
-            editor.find(options)
-            var range = editor.selection.getRange();
-            var start = range.start.column;
-            var len = range.end.column - start;
-            assert.equal(start + 0.1 * len, positions[i])
-        }
-        options.backwards = true;
-        positions = [1.2, 1, 0, 14, 12.2, 12, 11, 10, 9, 8, 7, 5.2, 5, 4, 3];
-        for (var i = 0; i < 16; i++) {
-            editor.find(options);
-            var range = editor.selection.getRange();
-            var start = range.start.column;
-            var len = range.end.column - start;
-            console.log(start + 0.1 * len)
-        }
-    }
 };
 
 });

@@ -1,0 +1,1 @@
+{"indexes":[{"v":1,"key":{"_id":1},"name":"_id_","ns":"sydjs.rsvps"},{"v":1,"key":{"meetup":1},"name":"meetup_1","ns":"sydjs.rsvps","background":true,"safe":null},{"v":1,"key":{"who":1},"name":"who_1","ns":"sydjs.rsvps","background":true,"safe":null},{"v":1,"key":{"attending":1},"name":"attending_1","ns":"sydjs.rsvps","background":true,"safe":null}]}

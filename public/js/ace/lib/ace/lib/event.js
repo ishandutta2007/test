@@ -1,38 +1,45 @@
 /* ***** BEGIN LICENSE BLOCK *****
- * Distributed under the BSD license:
+ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
- * Copyright (c) 2010, Ajax.org B.V.
- * All rights reserved.
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Ajax.org B.V. nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL AJAX.ORG B.V. BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * The Original Code is Ajax.org Code Editor (ACE).
+ *
+ * The Initial Developer of the Original Code is
+ * Ajax.org B.V.
+ * Portions created by the Initial Developer are Copyright (C) 2010
+ * the Initial Developer. All Rights Reserved.
+ *
+ * Contributor(s):
+ *      Fabian Jakobs <fabian AT ajax DOT org>
+ *
+ * Alternatively, the contents of this file may be used under the terms of
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * in which case the provisions of the GPL or the LGPL are applicable instead
+ * of those above. If you wish to allow use of your version of this file only
+ * under the terms of either the GPL or the LGPL, and not to allow others to
+ * use your version of this file under the terms of the MPL, indicate your
+ * decision by deleting the provisions above and replace them with the notice
+ * and other provisions required by the GPL or the LGPL. If you do not delete
+ * the provisions above, a recipient may use your version of this file under
+ * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
 
 define(function(require, exports, module) {
-"use strict";
 
 var keys = require("./keys");
 var useragent = require("./useragent");
+var dom = require("./dom");
 
 exports.addListener = function(elem, type, callback) {
     if (elem.addEventListener) {
@@ -40,7 +47,7 @@ exports.addListener = function(elem, type, callback) {
     }
     if (elem.attachEvent) {
         var wrapper = function() {
-            callback.call(elem, window.event);
+            callback(window.event);
         };
         callback._wrapper = wrapper;
         elem.attachEvent("on" + type, wrapper);
@@ -56,7 +63,7 @@ exports.removeListener = function(elem, type, callback) {
     }
 };
 
-/*
+/**
 * Prevents propagation and clobbers the default action of the passed event
 */
 exports.stopEvent = function(e) {
@@ -79,13 +86,29 @@ exports.preventDefault = function(e) {
         e.returnValue = false;
 };
 
-/*
+exports.getDocumentX = function(e) {
+    if (e.clientX) {
+        return e.clientX + dom.getPageScrollLeft();
+    } else {
+        return e.pageX;
+    }
+};
+
+exports.getDocumentY = function(e) {
+    if (e.clientY) {
+        return e.clientY + dom.getPageScrollTop();
+    } else {
+        return e.pageY;
+    }
+};
+
+/**
  * @return {Number} 0 for left button, 1 for middle button, 2 for right button
  */
 exports.getButton = function(e) {
     if (e.type == "dblclick")
         return 0;
-    if (e.type == "contextmenu" || (useragent.isMac && (e.ctrlKey && !e.altKey && !e.shiftKey)))
+    else if (e.type == "contextmenu")
         return 2;
 
     // DOM Event
@@ -98,27 +121,72 @@ exports.getButton = function(e) {
     }
 };
 
-exports.capture = function(el, eventHandler, releaseCaptureHandler) {
-    function onMouseUp(e) {
-        eventHandler && eventHandler(e);
-        releaseCaptureHandler && releaseCaptureHandler(e);
+if (document.documentElement.setCapture) {
+    exports.capture = function(el, eventHandler, releaseCaptureHandler) {
+        function onMouseMove(e) {
+            eventHandler(e);
+            return exports.stopPropagation(e);
+        }
 
-        exports.removeListener(document, "mousemove", eventHandler, true);
-        exports.removeListener(document, "mouseup", onMouseUp, true);
-        exports.removeListener(document, "dragstart", onMouseUp, true);
-    }
+        var called = false;
+        function onReleaseCapture(e) {
+            eventHandler(e);
 
-    exports.addListener(document, "mousemove", eventHandler, true);
-    exports.addListener(document, "mouseup", onMouseUp, true);
-    exports.addListener(document, "dragstart", onMouseUp, true);
-    
-    return onMouseUp;
-};
+            if (!called) {
+                called = true;
+                releaseCaptureHandler(e);
+            }
+
+            exports.removeListener(el, "mousemove", eventHandler);
+            exports.removeListener(el, "mouseup", onReleaseCapture);
+            exports.removeListener(el, "losecapture", onReleaseCapture);
+
+            el.releaseCapture();
+        }
+
+        exports.addListener(el, "mousemove", eventHandler);
+        exports.addListener(el, "mouseup", onReleaseCapture);
+        exports.addListener(el, "losecapture", onReleaseCapture);
+        el.setCapture();
+    };
+}
+else {
+    exports.capture = function(el, eventHandler, releaseCaptureHandler) {
+        function onMouseMove(e) {
+            eventHandler(e);
+            e.stopPropagation();
+        }
+
+        function onMouseUp(e) {
+            eventHandler && eventHandler(e);
+            releaseCaptureHandler && releaseCaptureHandler(e);
+
+            document.removeEventListener("mousemove", onMouseMove, true);
+            document.removeEventListener("mouseup", onMouseUp, true);
+
+            e.stopPropagation();
+        }
+
+        document.addEventListener("mousemove", onMouseMove, true);
+        document.addEventListener("mouseup", onMouseUp, true);
+    };
+}
 
 exports.addMouseWheelListener = function(el, callback) {
-    if ("onmousewheel" in el) {
-        exports.addListener(el, "mousewheel", function(e) {
-            var factor = 8;
+    var max = 0;
+    var listener = function(e) {
+        if (e.wheelDelta !== undefined) {
+
+            // some versions of Safari (e.g. 5.0.5) report insanely high
+            // scroll values. These browsers require a higher factor
+            if (Math.abs(e.wheelDeltaY) > max)
+                max = Math.abs(e.wheelDeltaY)
+
+            if (max > 5000)
+                factor = 400;
+            else
+                factor = 8;
+
             if (e.wheelDeltaX !== undefined) {
                 e.wheelX = -e.wheelDeltaX / factor;
                 e.wheelY = -e.wheelDeltaY / factor;
@@ -126,27 +194,8 @@ exports.addMouseWheelListener = function(el, callback) {
                 e.wheelX = 0;
                 e.wheelY = -e.wheelDelta / factor;
             }
-            callback(e);
-        });
-    } else if ("onwheel" in el) {
-        exports.addListener(el, "wheel",  function(e) {
-            var factor = 0.35;
-            switch (e.deltaMode) {
-                case e.DOM_DELTA_PIXEL:
-                    e.wheelX = e.deltaX * factor || 0;
-                    e.wheelY = e.deltaY * factor || 0;
-                    break;
-                case e.DOM_DELTA_LINE:
-                case e.DOM_DELTA_PAGE:
-                    e.wheelX = (e.deltaX || 0) * 5;
-                    e.wheelY = (e.deltaY || 0) * 5;
-                    break;
-            }
-            
-            callback(e);
-        });
-    } else {
-        exports.addListener(el, "DOMMouseScroll", function(e) {
+        }
+        else {
             if (e.axis && e.axis == e.HORIZONTAL_AXIS) {
                 e.wheelX = (e.detail || 0) * 5;
                 e.wheelY = 0;
@@ -154,143 +203,89 @@ exports.addMouseWheelListener = function(el, callback) {
                 e.wheelX = 0;
                 e.wheelY = (e.detail || 0) * 5;
             }
-            callback(e);
-        });
-    }
+        }
+        callback(e);
+    };
+    exports.addListener(el, "DOMMouseScroll", listener);
+    exports.addListener(el, "mousewheel", listener);
 };
 
-exports.addMultiMouseDownListener = function(el, timeouts, eventHandler, callbackName) {
+exports.addMultiMouseDownListener = function(el, button, count, timeout, callback) {
     var clicks = 0;
-    var startX, startY, timer; 
-    var eventNames = {
-        2: "dblclick",
-        3: "tripleclick",
-        4: "quadclick"
+    var startX, startY;
+
+    var listener = function(e) {
+        clicks += 1;
+        if (clicks == 1) {
+            startX = e.clientX;
+            startY = e.clientY;
+
+            setTimeout(function() {
+                clicks = 0;
+            }, timeout || 600);
+        }
+
+        var isButton = exports.getButton(e) == button;
+        if (!isButton || Math.abs(e.clientX - startX) > 5 || Math.abs(e.clientY - startY) > 5)
+            clicks = 0;
+
+        if (clicks == count) {
+            clicks = 0;
+            callback(e);
+        }
+
+        if (isButton)
+            return exports.preventDefault(e);
     };
 
-    exports.addListener(el, "mousedown", function(e) {
-        if (exports.getButton(e) !== 0) {
-            clicks = 0;
-        } else if (e.detail > 1) {
-            clicks++;
-            if (clicks > 4)
-                clicks = 1;
-        } else {
-            clicks = 1;
-        }
-        if (useragent.isIE) {
-            var isNewClick = Math.abs(e.clientX - startX) > 5 || Math.abs(e.clientY - startY) > 5;
-            if (!timer || isNewClick)
-                clicks = 1;
-            if (timer)
-                clearTimeout(timer);
-            timer = setTimeout(function() {timer = null}, timeouts[clicks - 1] || 600);
-
-            if (clicks == 1) {
-                startX = e.clientX;
-                startY = e.clientY;
-            }
-        }
-        
-        e._clicks = clicks;
-
-        eventHandler[callbackName]("mousedown", e);
-
-        if (clicks > 4)
-            clicks = 0;
-        else if (clicks > 1)
-            return eventHandler[callbackName](eventNames[clicks], e);
-    });
-
-    if (useragent.isOldIE) {
-        exports.addListener(el, "dblclick", function(e) {
-            clicks = 2;
-            if (timer)
-                clearTimeout(timer);
-            timer = setTimeout(function() {timer = null}, timeouts[clicks - 1] || 600);
-            eventHandler[callbackName]("mousedown", e);
-            eventHandler[callbackName](eventNames[clicks], e);
-        });
-    }
-};
-
-var getModifierHash = useragent.isMac && useragent.isOpera && !("KeyboardEvent" in window)
-    ? function(e) {
-        return 0 | (e.metaKey ? 1 : 0) | (e.altKey ? 2 : 0) | (e.shiftKey ? 4 : 0) | (e.ctrlKey ? 8 : 0);
-    }
-    : function(e) {
-        return 0 | (e.ctrlKey ? 1 : 0) | (e.altKey ? 2 : 0) | (e.shiftKey ? 4 : 0) | (e.metaKey ? 8 : 0);
-    };
-
-exports.getModifierString = function(e) {
-    return keys.KEY_MODS[getModifierHash(e)];
+    exports.addListener(el, "mousedown", listener);
+    useragent.isOldIE && exports.addListener(el, "dblclick", listener);
 };
 
 function normalizeCommandKeys(callback, e, keyCode) {
-    var hashId = getModifierHash(e);
-
-    if (!useragent.isMac && pressedKeys) {
-        if (pressedKeys[91] || pressedKeys[92])
-            hashId |= 8;
-        if (pressedKeys.altGr) {
-            if ((3 & hashId) != 3)
-                pressedKeys.altGr = 0;
-            else
-                return;
-        }
-        if (keyCode === 18 || keyCode === 17) {
-            var location = "location" in e ? e.location : e.keyLocation;
-            if (keyCode === 17 && location === 1) {
-                if (pressedKeys[keyCode] == 1)
-                    ts = e.timeStamp;
-            } else if (keyCode === 18 && hashId === 3 && location === 2) {
-                var dt = e.timestamp - ts;
-                if (dt < 50)
-                    pressedKeys.altGr = true;
-            }
-        }
+    var hashId = 0;
+    if (useragent.isOpera && useragent.isMac) {
+        hashId = 0 | (e.metaKey ? 1 : 0) | (e.altKey ? 2 : 0)
+            | (e.shiftKey ? 4 : 0) | (e.ctrlKey ? 8 : 0);
+    } else {
+        hashId = 0 | (e.ctrlKey ? 1 : 0) | (e.altKey ? 2 : 0)
+            | (e.shiftKey ? 4 : 0) | (e.metaKey ? 8 : 0);
     }
-    
+
     if (keyCode in keys.MODIFIER_KEYS) {
-        keyCode = -1;
-    }
-
-    if (hashId & 8 && (keyCode === 91 || keyCode === 93)) {
-        keyCode = -1;
-    }
-    
-    if (!hashId && keyCode === 13) {
-        var location = "location" in e ? e.location : e.keyLocation;
-        if (location === 3) {
-            callback(e, hashId, -keyCode);
-            if (e.defaultPrevented)
-                return;
+        switch (keys.MODIFIER_KEYS[keyCode]) {
+            case "Alt":
+                hashId = 2;
+                break;
+            case "Shift":
+                hashId = 4;
+                break
+            case "Ctrl":
+                hashId = 1;
+                break;
+            default:
+                hashId = 8;
+                break;
         }
-    }
-    
-    if (useragent.isChromeOS && hashId & 8) {
-        callback(e, hashId, keyCode);
-        if (e.defaultPrevented)
-            return;
-        else
-            hashId &= ~8;
+        keyCode = 0;
     }
 
-    // If there is no hashId and the keyCode is not a function key, then
+    if (hashId & 8 && (keyCode == 91 || keyCode == 93)) {
+        keyCode = 0;
+    }
+
+    // If there is no hashID and the keyCode is not a function key, then
     // we don't call the callback as we don't handle a command key here
     // (it's a normal key/character input).
-    if (!hashId && !(keyCode in keys.FUNCTION_KEYS) && !(keyCode in keys.PRINTABLE_KEYS)) {
+    if (!(keyCode in keys.FUNCTION_KEYS) && !(keyCode in keys.PRINTABLE_KEYS)) {
         return false;
     }
-    
     return callback(e, hashId, keyCode);
 }
 
-var pressedKeys = null;
-var ts = 0;
 exports.addCommandKeyListener = function(el, callback) {
     var addListener = exports.addListener;
-    if (useragent.isOldGecko || (useragent.isOpera && !("KeyboardEvent" in window))) {
+    if (useragent.isOldGecko) {
         // Old versions of Gecko aka. Firefox < 4.0 didn't repeat the keydown
         // event if the user pressed the key for a longer time. Instead, the
         // keydown event was fired once and later on only the keypress event.
@@ -305,62 +300,25 @@ exports.addCommandKeyListener = function(el, callback) {
             return normalizeCommandKeys(callback, e, lastKeyDownKeyCode);
         });
     } else {
-        var lastDefaultPrevented = null;
+        var lastDown = null;
 
         addListener(el, "keydown", function(e) {
-            pressedKeys[e.keyCode] = (pressedKeys[e.keyCode] || 0) + 1;
-            var result = normalizeCommandKeys(callback, e, e.keyCode);
-            lastDefaultPrevented = e.defaultPrevented;
-            return result;
+            lastDown = e.keyIdentifier || e.keyCode;
+            return normalizeCommandKeys(callback, e, e.keyCode);
         });
 
-        addListener(el, "keypress", function(e) {
-            if (lastDefaultPrevented && (e.ctrlKey || e.altKey || e.shiftKey || e.metaKey)) {
-                exports.stopEvent(e);
-                lastDefaultPrevented = null;
-            }
-        });
-
-        addListener(el, "keyup", function(e) {
-            pressedKeys[e.keyCode] = null;
-        });
-
-        if (!pressedKeys) {
-            pressedKeys = Object.create(null);
-            addListener(window, "focus", function(e) {
-                pressedKeys = Object.create(null);
+        // repeated keys are fired as keypress and not keydown events
+        if (useragent.isMac && useragent.isOpera) {
+            addListener(el, "keypress", function(e) {
+                var keyId = e.keyIdentifier || e.keyCode;
+                if (lastDown !== keyId) {
+                    return normalizeCommandKeys(callback, e, lastDown);
+                } else {
+                    lastDown = null;
+                }
             });
         }
     }
 };
 
-if (window.postMessage && !useragent.isOldIE) {
-    var postMessageId = 1;
-    exports.nextTick = function(callback, win) {
-        win = win || window;
-        var messageName = "zero-timeout-message-" + postMessageId;
-        exports.addListener(win, "message", function listener(e) {
-            if (e.data == messageName) {
-                exports.stopPropagation(e);
-                exports.removeListener(win, "message", listener);
-                callback();
-            }
-        });
-        win.postMessage(messageName, "*");
-    };
-}
-
-
-exports.nextFrame = window.requestAnimationFrame ||
-    window.mozRequestAnimationFrame ||
-    window.webkitRequestAnimationFrame ||
-    window.msRequestAnimationFrame ||
-    window.oRequestAnimationFrame;
-
-if (exports.nextFrame)
-    exports.nextFrame = exports.nextFrame.bind(window);
-else
-    exports.nextFrame = function(callback) {
-        setTimeout(callback, 17);
-    };
 });

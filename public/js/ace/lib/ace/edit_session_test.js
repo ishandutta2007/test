@@ -1,30 +1,38 @@
 /* ***** BEGIN LICENSE BLOCK *****
- * Distributed under the BSD license:
+ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
- * Copyright (c) 2010, Ajax.org B.V.
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Ajax.org B.V. nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL AJAX.ORG B.V. BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
+ *
+ * The Original Code is Ajax.org Code Editor (ACE).
+ *
+ * The Initial Developer of the Original Code is
+ * Ajax.org B.V.
+ * Portions created by the Initial Developer are Copyright (C) 2010
+ * the Initial Developer. All Rights Reserved.
+ *
+ * Contributor(s):
+ *      Fabian Jakobs <fabian AT ajax DOT org>
+ *      Julian Viereck <julian DOT viereck AT gmail DOT com>
+ *
+ * Alternatively, the contents of this file may be used under the terms of
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * in which case the provisions of the GPL or the LGPL are applicable instead
+ * of those above. If you wish to allow use of your version of this file only
+ * under the terms of either the GPL or the LGPL, and not to allow others to
+ * use your version of this file under the terms of the MPL, indicate your
+ * decision by deleting the provisions above and replace them with the notice
+ * and other provisions required by the GPL or the LGPL. If you do not delete
+ * the provisions above, a recipient may use your version of this file under
+ * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
 
@@ -34,7 +42,6 @@ if (typeof process !== "undefined") {
 }
 
 define(function(require, exports, module) {
-"use strict";
 
 var lang = require("./lib/lang");
 var EditSession = require("./edit_session").EditSession;
@@ -59,14 +66,6 @@ function createFoldTestSession() {
     session.addFold("foo...", new Range(1, 10, 2, 10));
     session.addFold("bar...", new Range(2, 20, 2, 25));
     return session;
-}
-
-function assertArray(a, b) {
-    assert.equal(a+"", b+"");
-    assert.ok(a.length == b.length);
-    for (var i = 0; i < a.length; i++) {
-        assert.equal(a[i], b[i]);
-    }
 }
 
 module.exports = {
@@ -110,10 +109,10 @@ module.exports = {
         assert.position(session.findMatchingBracket({row: 6, column: 20}), 1, 15);
         assert.position(session.findMatchingBracket({row: 1, column: 22}), 1, 20);
         assert.position(session.findMatchingBracket({row: 3, column: 31}), 3, 21);
-        assert.position(session.findMatchingBracket({row: 4, column: 24}), 4, 19);
+        assert.position(session.findMatchingBracket({row: 4, column: 24}), 4, 19);        
         assert.equal(session.findMatchingBracket({row: 0, column: 1}), null);
     },
-
+    
     "test: find matching closing bracket in JavaScript mode" : function() {
         var lines = [
             "function foo() {",
@@ -132,7 +131,7 @@ module.exports = {
         assert.position(session.findMatchingBracket({row: 1, column: 16}), 6, 19);
         assert.position(session.findMatchingBracket({row: 1, column: 21}), 1, 21);
         assert.position(session.findMatchingBracket({row: 3, column: 22}), 3, 30);
-        assert.position(session.findMatchingBracket({row: 4, column: 20}), 4, 23);
+        assert.position(session.findMatchingBracket({row: 4, column: 20}), 4, 23);        
     },
 
     "test: handle unbalanced brackets in JavaScript mode" : function() {
@@ -224,7 +223,7 @@ module.exports = {
             "12\t\t34",
             "ぁぁa"
         ]);
-
+        
         assert.equal(session.getScreenLastRowColumn(0), 4);
         assert.equal(session.getScreenLastRowColumn(1), 10);
         assert.equal(session.getScreenLastRowColumn(2), 5);
@@ -268,13 +267,13 @@ module.exports = {
             "12\t\t34",
             "ぁぁa"
         ]);
-
+        
         assert.position(session.documentToScreenPosition(0, 3), 0, 3);
         assert.position(session.documentToScreenPosition(1, 3), 1, 4);
         assert.position(session.documentToScreenPosition(1, 4), 1, 8);
         assert.position(session.documentToScreenPosition(2, 2), 2, 4);
     },
-
+    
     "test: documentToScreen with soft wrap": function() {
         var session = new EditSession(["foo bar foo bar"]);
         session.setUseWrapMode(true);
@@ -284,9 +283,10 @@ module.exports = {
         assert.position(session.documentToScreenPosition(0, 11), 0, 11);
         assert.position(session.documentToScreenPosition(0, 12), 1, 0);
     },
-
+    
     "test: documentToScreen with soft wrap and multibyte characters": function() {
-        var session = new EditSession(["ぁぁa"]);
+
+        session = new EditSession(["ぁぁa"]);
         session.setUseWrapMode(true);
         session.setWrapLimitRange(2, 2);
         session.adjustWrapLimit(80);
@@ -298,7 +298,7 @@ module.exports = {
 
     "test: documentToScreen should clip position to the document boundaries": function() {
         var session = new EditSession("foo bar\njuhu kinners");
-
+        
         assert.position(session.documentToScreenPosition(-1, 4), 0, 0);
         assert.position(session.documentToScreenPosition(3, 0), 1, 12);
     },
@@ -340,9 +340,9 @@ module.exports = {
         assert.position(session.screenToDocumentPosition(0, 12), 0, 11);
         assert.position(session.screenToDocumentPosition(0, 20), 0, 11);
     },
-
+    
     "test: screenToDocument with soft wrap and multi byte characters": function() {
-        var session = new EditSession(["ぁ a"]);
+        session = new EditSession(["ぁ a"]);
         session.setUseWrapMode(true);
         session.adjustWrapLimit(80);
 
@@ -352,10 +352,10 @@ module.exports = {
         assert.position(session.screenToDocumentPosition(0, 4), 0, 3);
         assert.position(session.screenToDocumentPosition(0, 5), 0, 3);
     },
-
+    
     "test: screenToDocument should clip position to the document boundaries": function() {
         var session = new EditSession("foo bar\njuhu kinners");
-
+        
         assert.position(session.screenToDocumentPosition(-1, 4), 0, 0);
         assert.position(session.screenToDocumentPosition(0, -1), 0, 0);
         assert.position(session.screenToDocumentPosition(0, 30), 0, 7);
@@ -363,17 +363,12 @@ module.exports = {
         assert.position(session.screenToDocumentPosition(1, 30), 1, 12);
         assert.position(session.screenToDocumentPosition(20, 50), 1, 12);
         assert.position(session.screenToDocumentPosition(20, 5), 1, 12);
-
-        // and the same for folded rows
-        session.addFold("...", new Range(0,1,1,3));
-        assert.position(session.screenToDocumentPosition(1, 2), 1, 12);
-        // for wrapped rows
-        session.setUseWrapMode(true);
-        session.setWrapLimitRange(5,5);
-        assert.position(session.screenToDocumentPosition(4, 1), 1, 12);
     },
 
     "test: wrapLine split function" : function() {
+        var splits;
+        var c = 0;
+
         function computeAndAssert(line, assertEqual, wrapLimit, tabSize) {
             wrapLimit = wrapLimit || 12;
             tabSize = tabSize || 4;
@@ -386,12 +381,11 @@ module.exports = {
                 assert.ok(splits[i] == assertEqual[i]);
             }
         }
-        
-        EditSession.prototype.$wrapAsCode = true;
+
         // Basic splitting.
         computeAndAssert("foo bar foo bar", [ 12 ]);
         computeAndAssert("foo bar f   bar", [ 12 ]);
-        computeAndAssert("foo bar f     r", [ 12 ]); // 14 if we enable 
+        computeAndAssert("foo bar f     r", [ 14 ]);
         computeAndAssert("foo bar foo bar foo bara foo", [12, 25]);
 
         // Don't split if there is only whitespaces/tabs at the end of the line.
@@ -407,7 +401,7 @@ module.exports = {
         computeAndAssert("foo \t \tbar", [ 7 ]);
 
         // Ignore spaces/tabs at beginning of split.
-        computeAndAssert("foo \t \t   \t \t bar", [ 7 ]); // 14
+        computeAndAssert("foo \t \t   \t \t bar", [ 14 ]);
 
         // Test wrapping for asian characters.
         computeAndAssert("ぁぁ", [1], 2);
@@ -419,27 +413,27 @@ module.exports = {
         computeAndAssert(" ab.c;ef++", [1, 3, 5, 7, 8], 2);
         computeAndAssert(" a.b", [1, 2, 3], 1);
         computeAndAssert("#>>", [1, 2], 1);
-        
-        // Test wrapping for punctuation in
-        EditSession.prototype.$wrapAsCode = false;
-        computeAndAssert("ab cde, Juhu kinners", [3, 8, 13, 19], 6);
     },
 
     "test get longest line" : function() {
         var session = new EditSession(["12"]);
         session.setTabSize(4);
+        assert.equal(session.getWidth(), 2);
         assert.equal(session.getScreenWidth(), 2);
 
-        session.doc.insertNewLine({row: 0, column: Infinity});
+        session.doc.insertNewLine(0);
         session.doc.insertLines(1, ["123"]);
+        assert.equal(session.getWidth(), 3);
         assert.equal(session.getScreenWidth(), 3);
 
-        session.doc.insertNewLine({row: 0, column: Infinity});
+        session.doc.insertNewLine(0);
         session.doc.insertLines(1, ["\t\t"]);
 
+        assert.equal(session.getWidth(), 3);
         assert.equal(session.getScreenWidth(), 8);
 
         session.setTabSize(2);
+        assert.equal(session.getWidth(), 3);
         assert.equal(session.getScreenWidth(), 4);
     },
 
@@ -616,9 +610,9 @@ module.exports = {
     },
 
     "test getFoldsInRange()": function() {
-        var session = createFoldTestSession();
-        var foldLines = session.$foldData;
-        var folds = foldLines[0].folds.concat(foldLines[1].folds);
+        var session = createFoldTestSession(),
+            foldLines = session.$foldData;
+            folds = foldLines[0].folds.concat(foldLines[1].folds);
 
         function test(startRow, startColumn, endColumn, endRow, folds) {
             var r = new Range(startRow, startColumn, endColumn, endRow);
@@ -647,7 +641,7 @@ module.exports = {
         var session = createFoldTestSession();
         var undoManager = session.getUndoManager();
         var foldLines = session.$foldData;
-
+        
         function insert(row, column, text) {
             session.insert({row: row, column: column}, text);
 
@@ -813,6 +807,13 @@ module.exports = {
     },
 
     "test fold wrap data compution": function() {
+        function assertArray(a, b) {
+            assert.ok(a.length == b.length);
+            for (var i = 0; i < a.length; i++) {
+                assert.equal(a[i], b[i]);
+            }
+        }
+
         function assertWrap(line0, line1, line2) {
             line0 && assertArray(wrapData[0], line0);
             line1 && assertArray(wrapData[1], line1);
@@ -904,27 +905,7 @@ module.exports = {
 
         return session;
     },
-    
-    "test delete fold with wrap enabled": function() {
-        var session = new EditSession("");
-        session.setValue([
-            "This is some placeholder text that will be folded inline.",
-            "This is some placeholder text that will be folded inline.",
-            "More text.",
-            "<p>The cursor in this paragraph text will be offset by 1 row.<p>",
-            "<p>Everything after this will be offset as well due to the folds in the row before too.</p>"
-        ].join("\n"));
-        session.addFold('...', new Range(0, 8, 0, 42));
-        session.addFold('...', new Range(1, 8, 1, 42));
-        session.addFold('...', new Range(3, 7, 3, 51));
-        session.setOption("wrap", 40);
-        session.remove(new Range(0,0, 2, 5));
-        // needed because adjustWrapLimit is called async from renderer
-        session.adjustWrapLimit(80);
-        
-        assert.equal(session.$wrapData + "", [[], [], [40, 76]] + "");
-    },
-        
+
     "test add fold": function() {
         var session = createFoldTestSession();
         var fold;
@@ -937,23 +918,23 @@ module.exports = {
                 fail = true;
             }
             if (fail != shouldFail) {
-                throw new Error("Expected to get an exception");
+                throw "Expected to get an exception";
             }
         }
 
-        tryAddFold("foo", new Range(0, 13, 0, 17), false);
+        tryAddFold("foo", new Range(0, 13, 0, 17), true);
         tryAddFold("foo", new Range(0, 14, 0, 18), true);
         tryAddFold("foo", new Range(0, 13, 0, 18), false);
         assert.equal(session.$foldData[0].folds.length, 1);
 
-        tryAddFold("f", new Range(0, 13, 0, 18), false);
+        tryAddFold("f", new Range(0, 13, 0, 18), true);
         tryAddFold("foo", new Range(0, 18, 0, 21), false);
         assert.equal(session.$foldData[0].folds.length, 2);
         session.removeFold(fold);
 
-        tryAddFold("foo", new Range(0, 18, 0, 22), false);
+        tryAddFold("foo", new Range(0, 18, 0, 22), true);
         tryAddFold("foo", new Range(0, 18, 0, 19), true);
-        tryAddFold("foo", new Range(0, 22, 1, 10), false);
+        tryAddFold("foo", new Range(0, 22, 1, 10), true);
     },
 
     "test add subfolds": function() {
@@ -983,93 +964,11 @@ module.exports = {
         assert.equal(foldData[0].folds.length, 1);
         assert.equal(foldData[0].folds[0], oldFold);
         assert.equal(fold.subFolds.length, 0);
-
-        session.unfold(null, true);
-        fold = session.addFold("fold0", new Range(0, 0, 0, 21));
-        session.addFold("fold0", new Range(0, 1, 0, 5));
-        session.addFold("fold0", new Range(0, 6, 0, 8));
-        assert.equal(fold.subFolds.length, 2);
-    },
-
-    "test row cache": function() {
-        var session = createFoldTestSession();
-
-        session.screenToDocumentPosition(2,3);
-        assertArray(session.$docRowCache, [1,3]);
-        assertArray(session.$screenRowCache, [1,2]);
-
-        session.screenToDocumentPosition(5,3);
-        assertArray(session.$docRowCache, [1,3,4]);
-        assertArray(session.$screenRowCache, [1,2,3]);
-
-        session.screenToDocumentPosition(0,3);
-        assertArray(session.$docRowCache, [1,3,4]);
-        assertArray(session.$screenRowCache, [1,2,3]);
-
-        var pos = session.screenToDocumentPosition(0,0);
-        assert.equal(pos.row, 0);
-        assertArray(session.$docRowCache, [1,3,4]);
-        assertArray(session.$screenRowCache, [1,2,3]);
-        
-        session.screenToDocumentPosition(1,0);
-        assertArray(session.$docRowCache, [1,3,4]);
-        assertArray(session.$screenRowCache, [1,2,3]);
-
-        session.$resetRowCache();
-        assertArray(session.$docRowCache, []);
-        assertArray(session.$screenRowCache, []);
-        
-        session.screenToDocumentPosition(1,3);
-        assertArray(session.$docRowCache, [1]);
-        assertArray(session.$screenRowCache, [1]);
-       
-        session.screenToDocumentPosition(5,3);
-        assertArray(session.$docRowCache, [1,3,4]);
-        assertArray(session.$screenRowCache, [1,2,3]);
-        
-        session = new EditSession(new Array(30).join("\n"));
-        session.documentToScreenPosition(2,0);
-        session.documentToScreenPosition(2,0);
-        assertArray(session.$docRowCache, [1,2]);
-        assertArray(session.$screenRowCache, [1,2]);
-    },
-
-    "test annotations": function() {
-        var session = new EditSession([]),
-            annotation = {row: 0, type: 'info', text: "This is a test."};
-
-        session.clearAnnotations();
-        assertArray(session.getAnnotations(), []);
-        session.setAnnotations([annotation]);
-        assertArray(session.getAnnotations(), [annotation]);
-    },
-    
-    "test: mode loading" : function(next) {
-        if (!require.undef) {
-            console.log("Skipping test: This test only runs in the browser");
-            next();
-            return;
-        }
-        var session = new EditSession([]);
-        session.setMode("ace/mode/javascript");
-        assert.equal(session.$modeid, "ace/mode/javascript");
-        session.on("changeMode", function() {
-            assert.equal(session.$modeid, "ace/mode/javascript");
-        });
-        session.setMode("ace/mode/sh", function(mode) {
-            assert.ok(!mode);
-        });
-        setTimeout(function() {
-            session.setMode("ace/mode/javascript", function(mode) {
-                session.setMode("ace/mode/javascript");
-                assert.equal(session.$modeid, "ace/mode/javascript");
-                next();
-            });
-        }, 0);
     }
 };
+
 });
 
 if (typeof module !== "undefined" && module === require.main) {
-    require("asyncjs").test.testcase(module.exports).exec();
+    require("asyncjs").test.testcase(module.exports).exec()
 }

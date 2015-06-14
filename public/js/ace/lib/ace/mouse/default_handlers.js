@@ -1,279 +1,303 @@
-/* ***** BEGIN LICENSE BLOCK *****
- * Distributed under the BSD license:
+/* vim:ts=4:sts=4:sw=4:
+ * ***** BEGIN LICENSE BLOCK *****
+ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
- * Copyright (c) 2010, Ajax.org B.V.
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Ajax.org B.V. nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL AJAX.ORG B.V. BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
+ *
+ * The Original Code is Ajax.org Code Editor (ACE).
+ *
+ * The Initial Developer of the Original Code is
+ * Ajax.org B.V.
+ * Portions created by the Initial Developer are Copyright (C) 2010
+ * the Initial Developer. All Rights Reserved.
+ *
+ * Contributor(s):
+ *      Fabian Jakobs <fabian AT ajax DOT org>
+ *      Mike de Boer <mike AT ajax DOT org>
+ *
+ * Alternatively, the contents of this file may be used under the terms of
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * in which case the provisions of the GPL or the LGPL are applicable instead
+ * of those above. If you wish to allow use of your version of this file only
+ * under the terms of either the GPL or the LGPL, and not to allow others to
+ * use your version of this file under the terms of the MPL, indicate your
+ * decision by deleting the provisions above and replace them with the notice
+ * and other provisions required by the GPL or the LGPL. If you do not delete
+ * the provisions above, a recipient may use your version of this file under
+ * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
 
 define(function(require, exports, module) {
-"use strict";
 
-var dom = require("../lib/dom");
 var event = require("../lib/event");
-var useragent = require("../lib/useragent");
+var dom = require("../lib/dom");
+var EventEmitter = require("../lib/event_emitter").EventEmitter;
+var BrowserFocus = require("../lib/browser_focus").BrowserFocus;
 
-var DRAG_OFFSET = 0; // pixels
+var STATE_UNKNOWN = 0;
+var STATE_SELECT = 1;
+var STATE_DRAG = 2;
 
-function DefaultHandlers(mouseHandler) {
-    mouseHandler.$clickSelection = null;
+var DRAG_TIMER = 250; // milliseconds
+var DRAG_OFFSET = 5; // pixels
 
-    var editor = mouseHandler.editor;
-    editor.setDefaultHandler("mousedown", this.onMouseDown.bind(mouseHandler));
-    editor.setDefaultHandler("dblclick", this.onDoubleClick.bind(mouseHandler));
-    editor.setDefaultHandler("tripleclick", this.onTripleClick.bind(mouseHandler));
-    editor.setDefaultHandler("quadclick", this.onQuadClick.bind(mouseHandler));
-    editor.setDefaultHandler("mousewheel", this.onMouseWheel.bind(mouseHandler));
+function DefaultHandlers(editor) {
+    this.editor = editor;
+    this.$clickSelection = null;
+    this.browserFocus = new BrowserFocus();
 
-    var exports = ["select", "startSelect", "selectEnd", "selectAllEnd", "selectByWordsEnd",
-        "selectByLinesEnd", "dragWait", "dragWaitEnd", "focusWait"];
-
-    exports.forEach(function(x) {
-        mouseHandler[x] = this[x];
-    }, this);
-
-    mouseHandler.selectByLines = this.extendSelectionBy.bind(mouseHandler, "getLineRange");
-    mouseHandler.selectByWords = this.extendSelectionBy.bind(mouseHandler, "getWordRange");
+    editor.setDefaultHandler("mousedown", this.onMouseDown.bind(this));
+    editor.setDefaultHandler("dblclick", this.onDoubleClick.bind(this));
+    editor.setDefaultHandler("tripleclick", this.onTripleClick.bind(this));
+    editor.setDefaultHandler("quadclick", this.onQuadClick.bind(this));
+    editor.setDefaultHandler("mousewheel", this.onScroll.bind(this));
 }
 
 (function() {
-
+    
     this.onMouseDown = function(ev) {
         var inSelection = ev.inSelection();
+        var pageX = ev.pageX;
+        var pageY = ev.pageY;
         var pos = ev.getDocumentPosition();
-        this.mousedownEvent = ev;
         var editor = this.editor;
+        var _self = this;
+        
+        var selectionRange = editor.getSelectionRange();
+        var selectionEmpty = selectionRange.isEmpty();
+        var state = STATE_UNKNOWN;
+        
+        // if this click caused the editor to be focused should not clear the
+        // selection
+        if (
+            inSelection && (
+                !this.browserFocus.isFocused()
+                || new Date().getTime() - this.browserFocus.lastFocus < 20
+                || !editor.isFocused()
+            )
+        ) {
+            editor.focus();
+            return;
+        }
 
         var button = ev.getButton();
         if (button !== 0) {
-            var selectionRange = editor.getSelectionRange();
-            var selectionEmpty = selectionRange.isEmpty();
-            editor.$blockScrolling++;
-            if (selectionEmpty)
-                editor.selection.moveToPosition(pos);
-            editor.$blockScrolling--;
-            // 2: contextmenu, 1: linux paste
-            editor.textInput.onContextMenu(ev.domEvent);
-            return; // stopping event here breaks contextmenu on ff mac
+            if (selectionEmpty) {
+                editor.moveCursorToPosition(pos);
+            }
+            if(button == 2) {
+                editor.textInput.onContextMenu({x: pageX, y: pageY}, selectionEmpty);
+                event.capture(editor.container, function(){}, editor.textInput.onContextMenuClose);
+            }
+            return;
         }
-
-        this.mousedownEvent.time = Date.now();
-        // if this click caused the editor to be focused should not clear the
-        // selection
-        if (inSelection && !editor.isFocused()) {
-            editor.focus();
-            if (this.$focusTimout && !this.$clickSelection && !editor.inMultiSelectMode) {
-                this.setState("focusWait");
-                this.captureMouse(ev);
+        else {
+            // Select the fold as the user clicks it.
+            var fold = editor.session.getFoldAt(pos.row, pos.column, 1);
+            if (fold) {
+                editor.selection.setSelectionRange(fold.range);
                 return;
             }
         }
 
-        this.captureMouse(ev);
-        this.startSelect(pos, ev.domEvent._clicks > 1);
+        if (!inSelection) {
+            // Directly pick STATE_SELECT, since the user is not clicking inside
+            // a selection.
+            onStartSelect(pos);
+        }
+
+        var mousePageX = pageX, mousePageY = pageY;
+        var overwrite = editor.getOverwrite();
+        var mousedownTime = (new Date()).getTime();
+        var dragCursor, dragRange;
+
+        var onMouseSelection = function(e) {
+            mousePageX = event.getDocumentX(e);
+            mousePageY = event.getDocumentY(e);
+        };
+
+        var onMouseSelectionEnd = function(e) {
+            clearInterval(timerId);
+            if (state == STATE_UNKNOWN)
+                onStartSelect(pos);
+            else if (state == STATE_DRAG)
+                onMouseDragSelectionEnd(e);
+
+            _self.$clickSelection = null;
+            state = STATE_UNKNOWN;
+        };
+
+        var onMouseDragSelectionEnd = function(e) {
+            dom.removeCssClass(editor.container, "ace_dragging");
+            editor.session.removeMarker(dragSelectionMarker);
+
+            if (!editor.$mouseHandler.$clickSelection) {
+                if (!dragCursor) {
+                    editor.moveCursorToPosition(pos);
+                    editor.selection.clearSelection(pos.row, pos.column);
+                }
+            }
+
+            if (!dragCursor)
+                return;
+
+            if (dragRange.contains(dragCursor.row, dragCursor.column)) {
+                dragCursor = null;
+                return;
+            }
+
+            editor.clearSelection();
+            if (e && (e.ctrlKey || e.altKey)) {
+                var session = editor.session;
+                var newRange = session.insert(dragCursor, session.getTextRange(dragRange));
+            } else {
+                var newRange = editor.moveText(dragRange, dragCursor);
+            }
+            if (!newRange) {
+                dragCursor = null;
+                return;
+            }
+
+            editor.selection.setSelectionRange(newRange);
+        };
+
+        var onSelectionInterval = function() {
+            if (state == STATE_UNKNOWN) {
+                var distance = calcDistance(pageX, pageY, mousePageX, mousePageY);
+                var time = (new Date()).getTime();
+
+                if (distance > DRAG_OFFSET) {
+                    state = STATE_SELECT;
+                    var cursor = editor.renderer.screenToTextCoordinates(mousePageX, mousePageY);
+                    cursor.row = Math.max(0, Math.min(cursor.row, editor.session.getLength()-1));
+                    onStartSelect(cursor);
+                }
+                else if ((time - mousedownTime) > DRAG_TIMER) {
+                    state = STATE_DRAG;
+                    dragRange = editor.getSelectionRange();
+                    var style = editor.getSelectionStyle();
+                    dragSelectionMarker = editor.session.addMarker(dragRange, "ace_selection", style);
+                    editor.clearSelection();
+                    dom.addCssClass(editor.container, "ace_dragging");
+                }
+
+            }
+
+            if (state == STATE_DRAG)
+                onDragSelectionInterval();
+            else if (state == STATE_SELECT)
+                onUpdateSelectionInterval();
+        };
+
+        function onStartSelect(pos) {
+            if (ev.getShiftKey()) {
+                editor.selection.selectToPosition(pos);
+            }
+            else {
+                if (!_self.$clickSelection) {
+                    editor.moveCursorToPosition(pos);
+                    editor.selection.clearSelection(pos.row, pos.column);
+                }
+            }
+            state = STATE_SELECT;
+        }
+
+        var onUpdateSelectionInterval = function() {
+            var anchor;
+            var cursor = editor.renderer.screenToTextCoordinates(mousePageX, mousePageY);
+            cursor.row = Math.max(0, Math.min(cursor.row, editor.session.getLength()-1));
+
+            if (_self.$clickSelection) {
+                if (_self.$clickSelection.contains(cursor.row, cursor.column)) {
+                    editor.selection.setSelectionRange(_self.$clickSelection);
+                }
+                else {
+                    if (_self.$clickSelection.compare(cursor.row, cursor.column) == -1) {
+                        anchor = _self.$clickSelection.end;
+                    }
+                    else {
+                        anchor = _self.$clickSelection.start;
+                    }
+                    editor.selection.setSelectionAnchor(anchor.row, anchor.column);
+                    editor.selection.selectToPosition(cursor);
+                }
+            }
+            else {
+                editor.selection.selectToPosition(cursor);
+            }
+
+            editor.renderer.scrollCursorIntoView();
+        };
+
+        var onDragSelectionInterval = function() {
+            dragCursor = editor.renderer.screenToTextCoordinates(mousePageX, mousePageY);
+            dragCursor.row = Math.max(0, Math.min(dragCursor.row, editor.session.getLength() - 1));
+
+            editor.moveCursorToPosition(dragCursor);
+        };
+
+        event.capture(editor.container, onMouseSelection, onMouseSelectionEnd);
+        var timerId = setInterval(onSelectionInterval, 20);
+
         return ev.preventDefault();
     };
-
-    this.startSelect = function(pos, waitForClickSelection) {
-        pos = pos || this.editor.renderer.screenToTextCoordinates(this.x, this.y);
-        var editor = this.editor;
-        // allow double/triple click handlers to change selection
-        editor.$blockScrolling++;
-        if (this.mousedownEvent.getShiftKey())
-            editor.selection.selectToPosition(pos);
-        else if (!waitForClickSelection)
-            editor.selection.moveToPosition(pos);
-        if (!waitForClickSelection)
-            this.select();
-        if (editor.renderer.scroller.setCapture) {
-            editor.renderer.scroller.setCapture();
-        }
-        editor.setStyle("ace_selecting");
-        this.setState("select");
-        editor.$blockScrolling--;
-    };
-
-    this.select = function() {
-        var anchor, editor = this.editor;
-        var cursor = editor.renderer.screenToTextCoordinates(this.x, this.y);
-        editor.$blockScrolling++;
-        if (this.$clickSelection) {
-            var cmp = this.$clickSelection.comparePoint(cursor);
-
-            if (cmp == -1) {
-                anchor = this.$clickSelection.end;
-            } else if (cmp == 1) {
-                anchor = this.$clickSelection.start;
-            } else {
-                var orientedRange = calcRangeOrientation(this.$clickSelection, cursor);
-                cursor = orientedRange.cursor;
-                anchor = orientedRange.anchor;
-            }
-            editor.selection.setSelectionAnchor(anchor.row, anchor.column);
-        }
-        editor.selection.selectToPosition(cursor);
-        editor.$blockScrolling--;
-        editor.renderer.scrollCursorIntoView();
-    };
-
-    this.extendSelectionBy = function(unitName) {
-        var anchor, editor = this.editor;
-        var cursor = editor.renderer.screenToTextCoordinates(this.x, this.y);
-        var range = editor.selection[unitName](cursor.row, cursor.column);
-        editor.$blockScrolling++;
-        if (this.$clickSelection) {
-            var cmpStart = this.$clickSelection.comparePoint(range.start);
-            var cmpEnd = this.$clickSelection.comparePoint(range.end);
-
-            if (cmpStart == -1 && cmpEnd <= 0) {
-                anchor = this.$clickSelection.end;
-                if (range.end.row != cursor.row || range.end.column != cursor.column)
-                    cursor = range.start;
-            } else if (cmpEnd == 1 && cmpStart >= 0) {
-                anchor = this.$clickSelection.start;
-                if (range.start.row != cursor.row || range.start.column != cursor.column)
-                    cursor = range.end;
-            } else if (cmpStart == -1 && cmpEnd == 1) {
-                cursor = range.end;
-                anchor = range.start;
-            } else {
-                var orientedRange = calcRangeOrientation(this.$clickSelection, cursor);
-                cursor = orientedRange.cursor;
-                anchor = orientedRange.anchor;
-            }
-            editor.selection.setSelectionAnchor(anchor.row, anchor.column);
-        }
-        editor.selection.selectToPosition(cursor);
-        editor.$blockScrolling--;
-        editor.renderer.scrollCursorIntoView();
-    };
-
-    this.selectEnd =
-    this.selectAllEnd =
-    this.selectByWordsEnd =
-    this.selectByLinesEnd = function() {
-        this.$clickSelection = null;
-        this.editor.unsetStyle("ace_selecting");
-        if (this.editor.renderer.scroller.releaseCapture) {
-            this.editor.renderer.scroller.releaseCapture();
-        }
-    };
-
-    this.focusWait = function() {
-        var distance = calcDistance(this.mousedownEvent.x, this.mousedownEvent.y, this.x, this.y);
-        var time = Date.now();
-
-        if (distance > DRAG_OFFSET || time - this.mousedownEvent.time > this.$focusTimout)
-            this.startSelect(this.mousedownEvent.getDocumentPosition());
-    };
-
+    
     this.onDoubleClick = function(ev) {
         var pos = ev.getDocumentPosition();
         var editor = this.editor;
-        var session = editor.session;
-
-        var range = session.getBracketRange(pos);
-        if (range) {
-            if (range.isEmpty()) {
-                range.start.column--;
-                range.end.column++;
-            }
-            this.setState("select");
-        } else {
-            range = editor.selection.getWordRange(pos.row, pos.column);
-            this.setState("selectByWords");
+        
+        // If the user dclicked on a fold, then expand it.
+        var fold = editor.session.getFoldAt(pos.row, pos.column, 1);
+        if (fold) {
+            editor.session.expandFold(fold);
         }
-        this.$clickSelection = range;
-        this.select();
+        else {
+            editor.moveCursorToPosition(pos);
+            editor.selection.selectWord();
+            this.$clickSelection = editor.getSelectionRange();
+        }
     };
-
+    
     this.onTripleClick = function(ev) {
         var pos = ev.getDocumentPosition();
         var editor = this.editor;
-
-        this.setState("selectByLines");
-        var range = editor.getSelectionRange();
-        if (range.isMultiLine() && range.contains(pos.row, pos.column)) {
-            this.$clickSelection = editor.selection.getLineRange(range.start.row);
-            this.$clickSelection.end = editor.selection.getLineRange(range.end.row).end;
-        } else {
-            this.$clickSelection = editor.selection.getLineRange(pos.row);
-        }
-        this.select();
+        
+        editor.moveCursorToPosition(pos);
+        editor.selection.selectLine();
+        this.$clickSelection = editor.getSelectionRange();
     };
-
+    
     this.onQuadClick = function(ev) {
         var editor = this.editor;
-
+        
         editor.selectAll();
         this.$clickSelection = editor.getSelectionRange();
-        this.setState("selectAll");
     };
-
-    this.onMouseWheel = function(ev) {
-        if (ev.getAccelKey())
-            return;
-
-        //shift wheel to horiz scroll
-        if (ev.getShiftKey() && ev.wheelY && !ev.wheelX) {
-            ev.wheelX = ev.wheelY;
-            ev.wheelY = 0;
-        }
-
-        var t = ev.domEvent.timeStamp;
-        var dt = t - (this.$lastScrollTime||0);
-        
+    
+    this.onScroll = function(ev) {
         var editor = this.editor;
-        var isScrolable = editor.renderer.isScrollableBy(ev.wheelX * ev.speed, ev.wheelY * ev.speed);
-        if (isScrolable || dt < 200) {
-            this.$lastScrollTime = t;
-            editor.renderer.scrollBy(ev.wheelX * ev.speed, ev.wheelY * ev.speed);
-            return ev.stop();
-        }
+        
+        editor.renderer.scrollBy(ev.wheelX * ev.speed, ev.wheelY * ev.speed);
+        if (editor.renderer.isScrollableBy(ev.wheelX * ev.speed, ev.wheelY * ev.speed))
+            return ev.preventDefault();
     };
-
+    
 }).call(DefaultHandlers.prototype);
 
 exports.DefaultHandlers = DefaultHandlers;
 
 function calcDistance(ax, ay, bx, by) {
     return Math.sqrt(Math.pow(bx - ax, 2) + Math.pow(by - ay, 2));
-}
-
-function calcRangeOrientation(range, cursor) {
-    if (range.start.row == range.end.row)
-        var cmp = 2 * cursor.column - range.start.column - range.end.column;
-    else if (range.start.row == range.end.row - 1 && !range.start.column && !range.end.column)
-        var cmp = cursor.column - 4;
-    else
-        var cmp = 2 * cursor.row - range.start.row - range.end.row;
-
-    if (cmp < 0)
-        return {cursor: range.start, anchor: range.end};
-    else
-        return {cursor: range.end, anchor: range.start};
 }
 
 });
