@@ -17,7 +17,7 @@
     "jsx": "^0.9.89",
     "keystone": "0.3.10",
     "keystone-utils": "^0.1.13",
-    "lodash": "^3.9.1",
+    "lodash": "^3.17.13",
     "moment": "^2.10.3",
     "newrelic": "^1.19.1",
     "passport": "^0.2.1",
