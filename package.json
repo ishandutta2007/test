@@ -25,7 +25,7 @@
     "passport-github": "^0.1.5",
     "passport-google-oauth": "^0.2.0",
     "passport-twitter": "^1.0.3",
-    "react": "^0.13.3",
+    "react": "^16.13.1",
     "react-router": "^0.13.3",
     "react-select": "^0.4.9",
     "request": "^2.55.0",
